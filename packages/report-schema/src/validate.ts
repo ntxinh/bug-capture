@@ -5,6 +5,11 @@ export type ValidationResult =
   | { ok: false; errors: string[] };
 const SOURCES = new Set(["extension", "sdk"]);
 
+/**
+ * Structural (shallow) validation: field presence and top-level types only.
+ * Does NOT validate element shapes inside `events`/`screenshots` or full
+ * artifact conformance — deep validation lands with Phase 3 ingest.
+ */
 export function validateEnvelope(input: unknown): ValidationResult {
   const errors: string[] = [];
   const e = input as Record<string, unknown> | null;

@@ -28,12 +28,12 @@ export const SENSITIVE_KEYS = [
   "apikey",
 ] as const;
 
-function keyRule(key: string, target: RedactionTarget): RedactionRule {
+/** Exact-match, case-insensitive key rule — building block for key lists. */
+export function keyRule(key: string, target: RedactionTarget): RedactionRule {
   return {
     id: `${target}:${key}`,
     target,
-    // exact key match, case-insensitive
-    pattern: new RegExp(`^${key.replace(/-/g, "\\-")}$`, "i"),
+    pattern: new RegExp(`^${key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i"),
     action: "mask",
   };
 }

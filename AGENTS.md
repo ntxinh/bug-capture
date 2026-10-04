@@ -17,6 +17,7 @@
    (packages/report-core), never new schemas.
 5. **Redaction precedes upload.** Any remote path must pass the envelope
    through `@bugcapture/redaction` client-side before transmission.
+6. ✗ **No AI features before the data model stabilizes.**
 
 ## Conventions
 

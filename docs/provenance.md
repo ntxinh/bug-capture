@@ -9,4 +9,7 @@
 
 1. `cd ../openjam && git log --oneline <old>..HEAD` — review changes.
 2. `git archive HEAD | tar -x -C ../bug-capture/apps/extension` or selective cherry-pick.
+   Re-apply `"name": "@bugcapture/extension"` in `apps/extension/package.json`
+   (archive restores upstream's `openjam`), plus any other intentional
+   deviations listed here.
 3. Update the commit above. Keep `apps/extension` build + tests green.

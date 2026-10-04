@@ -22,7 +22,7 @@ format:
 	bunx biome format --write .
 
 typecheck:
-	bun run --filter '*' check-types 2>/dev/null || true
+	bun run --filter '*' check-types
 
 clean:
 	find . \( -name node_modules -o -name dist -o -name .turbo -o -name coverage \) -type d -prune -exec rm -rf {} +
