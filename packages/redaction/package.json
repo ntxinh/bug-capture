@@ -1,0 +1,11 @@
+{
+  "name": "@bugcapture/redaction",
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "check-types": "tsc --noEmit -p tsconfig.json"
+  }
+}
