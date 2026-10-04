@@ -7,6 +7,7 @@
       "devDependencies": {
         "@biomejs/biome": "2.3.13",
         "@types/bun": "latest",
+        "bun-types": "^1.4.2",
         "typescript": "^5.7.0",
       },
     },
@@ -22,6 +23,10 @@
         "esbuild": "0.28.0",
         "playwright": "^1.60.0",
       },
+    },
+    "packages/report-schema": {
+      "name": "@bugcapture/report-schema",
+      "version": "0.1.0",
     },
   },
   "packages": {
@@ -44,6 +49,8 @@
     "@biomejs/cli-win32-x64": ["@biomejs/cli-win32-x64@2.3.13", "", { "os": "win32", "cpu": "x64" }, "sha512-trDw2ogdM2lyav9WFQsdsfdVy1dvZALymRpgmWsvSez0BJzBjulhOT/t+wyKeh3pZWvwP3VMs1SoOKwO3wecMQ=="],
 
     "@bugcapture/extension": ["@bugcapture/extension@workspace:apps/extension"],
+
+    "@bugcapture/report-schema": ["@bugcapture/report-schema@workspace:packages/report-schema"],
 
     "@esbuild/aix-ppc64": ["@esbuild/aix-ppc64@0.28.0", "", { "os": "aix", "cpu": "ppc64" }, "sha512-lhRUCeuOyJQURhTxl4WkpFTjIsbDayJHih5kZC1giwE+MhIzAb7mEsQMqMf18rHLsrb5qI1tafG20mLxEWcWlA=="],
 
