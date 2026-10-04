@@ -1,5 +1,5 @@
 import type { Db } from "@bugcapture/db";
-import { member, projects } from "@bugcapture/db/schema";
+import { member, projects, reports } from "@bugcapture/db/schema";
 import { and, eq } from "drizzle-orm";
 
 export type Role = "owner" | "admin" | "member";
@@ -40,4 +40,13 @@ export async function projectInOrg(db: Db, orgId: string, projectId: string) {
     .from(projects)
     .where(and(eq(projects.id, projectId), eq(projects.organizationId, orgId)));
   return p ?? null;
+}
+
+/** Report lookup scoped to org — returns null if not found OR not in org (404 semantics). */
+export async function reportInOrg(db: Db, orgId: string, reportId: string) {
+  const [r] = await db
+    .select()
+    .from(reports)
+    .where(and(eq(reports.id, reportId), eq(reports.organizationId, orgId)));
+  return r ?? null;
 }
