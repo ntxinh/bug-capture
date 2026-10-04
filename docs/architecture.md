@@ -23,3 +23,5 @@ diagram, §3 core abstractions, §8 remote flow).
 - `packages/redaction` is pure functions — runs in extension background AND server.
 - Backend (Phase 3+): Hono API → Drizzle → Postgres; artifacts → R2 via
   `ArtifactStorage`; auth → Better Auth (auth tables separate from domain).
+- `apps/api` (Hono) → `packages/db` (Drizzle→Postgres); auth tables owned by
+  Better Auth; policy layer enforces org scope, 404-not-403 for cross-org.

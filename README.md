@@ -34,6 +34,14 @@ The extension works fully offline; the server is an optional destination.
     make test-e2e       # playwright extension e2e (needs browsers)
     make lint           # biome check
 
+
+## Backend (Phase 3)
+
+    make db-up          # postgres:16 via podman/docker compose
+    make db-migrate     # apply drizzle migrations
+    make dev-api        # hono api on :3000  (/api/auth/*, /api/v1/*)
+    make test-api       # api tests — needs podman socket + testcontainers env from .env.example
+
 ## Docs
 
 - `DESIGN.md` — product design (working spec)
