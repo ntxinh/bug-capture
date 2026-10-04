@@ -18,7 +18,7 @@ export async function withTestDb(): Promise<TestCtx> {
   await migrate(url);
   const db = createDb(url);
   const auth = createAuth(db, "test-secret", "http://localhost:3000");
-  const app = buildApp(auth);
+  const app = buildApp(db, auth);
   return { app, db, stop: () => container.stop() };
 }
 

@@ -5,6 +5,6 @@ import { createAuth } from "./lib/auth";
 
 const db = createDb(env.databaseUrl);
 const auth = createAuth(db, env.betterAuthSecret, env.betterAuthUrl);
-const app = buildApp(auth);
+const app = buildApp(db, auth);
 
 export default { port: env.port, fetch: app.fetch };
