@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "servers": [
+    {
+      "id": "typescript",
+      "command": ["typescript-language-server", "--stdio"],
+      "languages": [
+        "typescript",
+        "typescriptreact",
+        "javascript",
+        "javascriptreact"
+      ],
+      "workspacePatterns": ["packages/**", "apps/**"]
+    },
+    {
+      "id": "biome",
+      "command": ["biome", "lsp-proxy"],
+      "languages": ["javascript", "typescript", "json", "jsonc", "css"],
+      "workspacePatterns": ["**"]
+    }
+  ]
+}

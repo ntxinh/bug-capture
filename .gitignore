@@ -1,0 +1,14 @@
+node_modules/
+dist/
+.turbo/
+.next/
+coverage/
+*.tsbuildinfo
+.DS_Store
+# extension build output
+apps/extension/dist/
+apps/extension/src/generated/
+apps/extension/openjam.zip
+# playwright
+apps/extension/test-results/
+apps/extension/playwright-report/
