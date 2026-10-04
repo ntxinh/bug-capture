@@ -8,13 +8,6 @@
   },
   "javascript": { "formatter": { "quoteStyle": "double" } },
   "files": {
-    "includes": [
-      "**",
-      "!apps/extension/dist",
-      "!apps/extension/src/generated",
-      "!docs/superpowers",
-      "!apps/extension/docs",
-      "!apps/extension/e2e/**/*.spec.mjs-snapshots"
-    ]
+    "includes": ["**", "!apps/extension", "!docs/superpowers"]
   }
 }
