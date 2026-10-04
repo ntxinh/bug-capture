@@ -1,0 +1,35 @@
+{
+  "name": "@bugcapture/extension",
+  "version": "0.7.2",
+  "private": true,
+  "type": "module",
+  "description": "Open-source jam.dev alternative: Chrome MV3 extension capturing console/network/errors/screenshots/device + rrweb session replay on one timeline, exported as a self-contained HTML bug report.",
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "npm run build && bun test test/ && playwright test",
+    "test:unit": "bun test test/",
+    "test:e2e": "playwright test",
+    "test:snapshots": "docker run --rm -e CI=1 -e HOME=/tmp -v \"$PWD\":/work -v /work/node_modules -w /work mcr.microsoft.com/playwright:v1.60.0-jammy bash -lc 'npm ci && npm run build && npx playwright test --update-snapshots'",
+    "eval": "node eval/build-reports.mjs && node eval/run-eval.mjs",
+    "screenshots": "node scripts/screenshots.mjs",
+    "icons": "node scripts/icons.mjs",
+    "redact": "node scripts/redact-report.mjs",
+    "version": "node scripts/sync-version.mjs && git add manifest.json docs/index.html",
+    "bump": "npm version --ignore-scripts=false",
+    "package": "npm run build && zip -r openjam.zip manifest.json LICENSE background.js event-kinds.js manifest.js issue-link.js popup.html popup.js openjam-popup.js viewer.html viewer.js renderer.js waveform.js report-builder.js audio-sync.js offscreen.html offscreen.js mic-permission.html mic-permission.js icons dist src/generated src/lanes src/capture-limits.js src/device-info.js src/foreign-frames.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SaintPepsi/openjam.git"
+  },
+  "license": "GPL-3.0-or-later",
+  "dependencies": {
+    "@rrweb/replay": "2.0.1",
+    "rrweb": "2.0.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.60.0",
+    "esbuild": "0.28.0",
+    "playwright": "^1.60.0"
+  }
+}

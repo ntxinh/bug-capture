@@ -1,0 +1,13 @@
+node_modules/
+dist/
+src/generated/
+*.log
+.DS_Store
+openjam.zip
+test-results/
+eval/out/
+.gate/
+docs/tickets/
+
+# devcontainer credential staging (scripts/devcontainer-auth.mjs)
+.devcontainer/.claude-creds.json
