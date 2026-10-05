@@ -6,7 +6,7 @@
   "permissions": ["debugger", "storage", "unlimitedStorage", "scripting", "offscreen"],
   "host_permissions": ["<all_urls>"],
   "content_security_policy": {
-    "extension_pages": "script-src 'self'; object-src 'self'; style-src 'self' 'unsafe-inline' data: *; img-src * data: blob:; media-src * data: blob:; font-src * data:; frame-src 'self' data: blob:; child-src 'self' data: blob:; connect-src 'none'"
+    "extension_pages": "script-src 'self'; object-src 'self'; style-src 'self' 'unsafe-inline' data: *; img-src * data: blob:; media-src * data: blob:; font-src * data:; frame-src 'self' data: blob:; child-src 'self' data: blob:; connect-src http: https:"
   },
   "background": { "service_worker": "background.js", "type": "module" },
   "content_scripts": [

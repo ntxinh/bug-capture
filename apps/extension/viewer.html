@@ -19,6 +19,10 @@
   #bar{display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,#1b1f28,#141821)}
   #bar strong{font-size:14px;font-weight:800;letter-spacing:-.01em;display:flex;align-items:center;gap:9px;white-space:nowrap;flex:0 0 auto}
   #bar strong::before{content:'🍓🫐🍇🍒';font-size:12px;white-space:nowrap}
+  #upload{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+  #upload input{background:var(--panel);border:1px solid var(--line);border-radius:6px;color:var(--fg);padding:6px 8px;font:inherit;font-size:11px;width:150px}
+  #upload #api-url{width:210px}
+  #upload-status{color:var(--muted);font-size:11px}
   #bar .spacer{flex:1}
   #bar .note{font-family:ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,monospace;font-size:11px;color:var(--dim);letter-spacing:.02em}
   #bar button{background:var(--accent);color:var(--accent-ink);border:0;border-radius:999px;padding:8px 16px;font-weight:650;
@@ -36,6 +40,13 @@
     <strong>OpenJam</strong>
     <span class="note">self-contained · offline</span>
     <span class="spacer"></span>
+    <section id="upload">
+      <input id="api-url" placeholder="API URL" autocomplete="off">
+      <input id="token" type="password" placeholder="Token (oj_pat_…)" autocomplete="off">
+      <input id="project-id" placeholder="Project ID" autocomplete="off">
+      <button id="upload-btn">⇪ Upload</button>
+      <span id="upload-status"></span>
+    </section>
     <button id="download">⬇ Download self-contained HTML</button>
   </div>
   <div id="scroll">

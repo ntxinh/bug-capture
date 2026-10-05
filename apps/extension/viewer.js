@@ -7,6 +7,41 @@
 import { renderReport, mountReplay, mountAudio, REPORT_CSS, REPLAY_CSS } from "./renderer.js";
 import { buildReportHTML } from "./report-builder.js";
 import { renderErrorReport } from "./issue-link.js";
+import { uploadReport } from "./uploader.js";
+
+const CONFIG_KEY = "oj_upload_config";
+
+// Upload-config persistence + the upload button. Config lives in
+// chrome.storage.local keyed under CONFIG_KEY ({apiUrl, token, projectId});
+// inputs save on blur so the fields survive reloads.
+function wireUpload(report) {
+  const el = (id) => document.getElementById(id);
+  const status = el("upload-status");
+  const cfg = {};
+  chrome.storage.local.get(CONFIG_KEY).then((s) => {
+    Object.assign(cfg, s[CONFIG_KEY]);
+    el("api-url").value = cfg.apiUrl || "";
+    el("token").value = cfg.token || "";
+    el("project-id").value = cfg.projectId || "";
+  });
+  const save = () => chrome.storage.local.set({ [CONFIG_KEY]: cfg });
+  for (const [id, prop] of [["api-url", "apiUrl"], ["token", "token"], ["project-id", "projectId"]])
+    el(id).addEventListener("blur", (e) => {
+      cfg[prop] = e.target.value.trim();
+      save();
+    });
+  el("upload-btn").addEventListener("click", async () => {
+    status.style.color = "";
+    status.textContent = "Uploading…";
+    try {
+      const { reportId } = await uploadReport(report, cfg);
+      status.textContent = `Uploaded → ${reportId}`;
+    } catch (err) {
+      status.style.color = "#f85149";
+      status.textContent = `error: ${err.status ? err.status + " " : ""}${err.body?.error || err.message}`;
+    }
+  });
+}
 
 const ENV = { version: chrome.runtime.getManifest().version, userAgent: navigator.userAgent };
 const params = new URLSearchParams(location.search);
@@ -45,7 +80,7 @@ async function load() {
   report.rrwebEvents = asEventArray(report.rrwebEvents);
 
   renderReport(document.getElementById("app"), report);
-
+  wireUpload(report);
   // dist/rrweb-replay.js defines the RRWebReplayer global; absent if unbuilt.
   const ReplayerCtor = globalThis.RRWebReplayer;
   const hasReplay = !!(ReplayerCtor && report.rrwebEvents && report.rrwebEvents.length > 1);
