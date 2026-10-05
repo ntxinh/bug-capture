@@ -50,7 +50,11 @@ const originAllowed = async (
 // projectId comes from the key, never the body — a body projectId is stripped.
 const captureBody = envelopeSchema.omit({ projectId: true });
 
-export function captureRoutes(db: Db, storage: ArtifactStorage, baseUrl: string) {
+export function captureRoutes(
+  db: Db,
+  storage: ArtifactStorage,
+  baseUrl: string,
+) {
   const r = new Hono();
 
   // CORS first — preflights must be answered before auth resolution.
