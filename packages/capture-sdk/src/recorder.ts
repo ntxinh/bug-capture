@@ -205,7 +205,9 @@ export class Recorder {
         // clone() tees the stream so the caller still gets the body; captured
         // in the background so streaming responses aren't held open — the
         // event object is mutated in place once the body lands.
-        if (TEXTUAL.test(res.headers.get("content-type") ?? "")) {
+        const ct = res.headers.get("content-type") ?? "";
+        // text/event-stream is "textual" but unbounded — never tee an SSE stream.
+        if (TEXTUAL.test(ct) && !/event-stream/i.test(ct)) {
           res
             .clone()
             .text()
