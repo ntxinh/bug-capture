@@ -25,7 +25,7 @@ const patchSession = z.object({
 
 export function captureSessionsRoutes(db: Db, auth: Auth) {
   const r = new Hono();
-  r.use("*", requireAuth(auth));
+  r.use("*", requireAuth(auth, db));
 
   r.post("/", zjson("json", createSession), async (c) => {
     const { projectId, environmentId } = c.req.valid("json");

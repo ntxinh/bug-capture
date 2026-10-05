@@ -33,7 +33,7 @@ const patchReport = z.object({
 
 export function reportsRoutes(db: Db, auth: Auth) {
   const r = new Hono();
-  r.use("*", requireAuth(auth));
+  r.use("*", requireAuth(auth, db));
 
   r.post("/", zjson("json", createReport), async (c) => {
     const { projectId, environmentId, ...rest } = c.req.valid("json");

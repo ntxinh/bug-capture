@@ -1,0 +1,14 @@
+{
+  "name": "@bugcapture/storage",
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "check-types": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "aws4fetch": "^1.0.20"
+  }
+}

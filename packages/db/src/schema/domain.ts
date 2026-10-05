@@ -182,3 +182,25 @@ export const externalLinks = pgTable(
   },
   (t) => [index("external_links_reportId_idx").on(t.reportId)],
 );
+
+export const personalAccessTokens = pgTable(
+  "personal_access_tokens",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    label: text("label").notNull(),
+    tokenHash: text("token_hash").notNull().unique(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    lastUsedAt: timestamp("last_used_at"),
+    revokedAt: timestamp("revoked_at"),
+  },
+  (t) => [
+    index("personal_access_tokens_org_idx").on(t.organizationId),
+    index("personal_access_tokens_user_idx").on(t.userId),
+  ],
+);

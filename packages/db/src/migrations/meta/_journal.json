@@ -15,6 +15,13 @@
       "when": 1791166507631,
       "tag": "0001_sad_echo",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791169641292,
+      "tag": "0002_shallow_anthem",
+      "breakpoints": true
     }
   ]
 }

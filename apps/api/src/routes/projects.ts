@@ -8,19 +8,10 @@ import { eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 import type { Auth } from "../lib/auth";
+import { isUniqueViolation } from "../lib/errors";
 import { isAdmin, projectInOrg } from "../lib/policy";
 import { requireAuth } from "../lib/session";
 import { zjson } from "../lib/validate";
-
-// postgres.js surfaces `code` directly; drizzle wraps it in DrizzleQueryError.cause
-const isUniqueViolation = (e: unknown): boolean => {
-  let cur: unknown = e;
-  while (cur && typeof cur === "object") {
-    if ("code" in cur && cur.code === "23505") return true;
-    cur = "cause" in cur ? cur.cause : undefined;
-  }
-  return false;
-};
 
 const createProject = z.object({
   name: z.string().min(1).max(120),
@@ -52,7 +43,7 @@ const createOrigin = z.object({ origin: z.string().url() });
 
 export function projectsRoutes(db: Db, auth: Auth) {
   const r = new Hono();
-  r.use("*", requireAuth(auth));
+  r.use("*", requireAuth(auth, db));
 
   r.post("/", zjson("json", createProject), async (c) => {
     const { name, slug } = c.req.valid("json");
