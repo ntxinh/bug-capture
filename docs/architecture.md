@@ -31,3 +31,9 @@ diagram, §3 core abstractions, §8 remote flow).
 - Static mounts on the API: `/app` → `apps/web` SPA (session cookie),
   `/ext` → `apps/extension` statics (`dist/rrweb-replay.*` for the report
   viewer). PAT `Bearer` is for non-browser clients only.
+- `@bugcapture/capture` (`packages/capture-sdk`) is the embeddable site SDK —
+  rrweb + console/network/error recorder → `initOpenJam().submit()` → public
+  `/api/v1/capture/*` routes (ingest / `PUT` uploads / finalize). Auth is the
+  project's `public_key` in `x-openjam-key` + per-project `project_origins`
+  CORS/origin allowlist (zero rows → any origin); `projectId` resolves
+  server-side from the key, never the body.

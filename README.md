@@ -60,6 +60,40 @@ PAT in the extension viewer's upload config and upload; open the report at
 `/app/report.html?id=…`. `/app` uses the session cookie; PAT `Bearer` is
 for non-browser clients only.
 
+## Site SDK (Phase 6)
+
+`@bugcapture/capture` (`packages/capture-sdk`) embeds capture on any site —
+rrweb replay + console/network/error recording, no extension needed.
+
+```js
+import { initOpenJam } from "@bugcapture/capture";
+
+const oj = initOpenJam({ projectKey: "oj_pk_…", apiUrl: "https://bugs.example.com" });
+await oj.submit({ title: "Checkout is broken", description: "…" }); // → { reportId }
+```
+
+No bundler? Build once and serve the file — any host works since the SDK only
+needs an ES-module import:
+
+    bun build packages/capture-sdk/src/index.ts --format esm --target browser --outfile capture-sdk.js
+
+    <script type="module">
+      import { initOpenJam } from "/capture-sdk.js";
+      window.oj = initOpenJam({ projectKey, apiUrl });
+    </script>
+
+`initOpenJam` starts recording immediately; `submit()` builds the envelope,
+then `POST /api/v1/capture/ingest` → `PUT` each artifact → `POST
+/api/v1/capture/reports/:id/finalize`, all authenticated by `projectKey`
+(`x-openjam-key` header) — `projectId` resolves server-side from the key.
+
+Setup: the project's `publicKey` (`oj_pk_…`) comes from `POST /api/v1/projects`
+(or the `projects` table). To restrict which sites may submit, add allowed
+origins via `POST /api/v1/projects/:id/origins` (`{origin:
+"https://app.example.com"}` — trailing slashes ignored). Zero configured
+origins allows any origin — fine for dev, lock it down before exposing
+publicly. `oj.discard()` stops recording without submitting.
+
 ## Docs
 
 - `DESIGN.md` — product design (working spec)
