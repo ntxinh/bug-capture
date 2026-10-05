@@ -221,14 +221,17 @@ export async function handleUploadPut(
   reportId: string,
   key: string,
   declaredLength: string | undefined,
-  body: ArrayBuffer,
+  req: Request,
 ): Promise<Response> {
   if (!SAFE_SEGMENT.test(reportId) || !SAFE_SEGMENT.test(key))
     return json({ error: "not found" }, 404);
   const artifact = await findArtifact(db, scope, reportId, key);
   if (!artifact) return json({ error: "not found" }, 404);
+  // Declared length is checked before the body is buffered — a lying
+  // content-length must not force a full read of a wrong-sized upload.
   if (declaredLength != null && Number(declaredLength) !== artifact.sizeBytes)
     return json({ error: "size mismatch" }, 413);
+  const body = await req.arrayBuffer();
   if (body.byteLength !== artifact.sizeBytes)
     return json({ error: "size mismatch" }, 413);
   if (

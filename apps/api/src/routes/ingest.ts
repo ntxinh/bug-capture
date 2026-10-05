@@ -46,7 +46,7 @@ export function ingestRoutes(db: Db, auth: Auth, storage: ArtifactStorage) {
       reportId,
       key,
       c.req.header("content-length"),
-      await c.req.arrayBuffer(),
+      c.req.raw,
     );
   });
 

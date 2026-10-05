@@ -273,4 +273,34 @@ describe("public capture routes", () => {
       await ctx.stop();
     }
   }, 120_000);
+
+  it("project B's key cannot PUT or finalize project A's report → 404", async () => {
+    const ctx = await withTestDb();
+    try {
+      const { cookie, project } = await setup(ctx);
+      const other = await createProject(ctx, cookie, "other");
+      const res = await ingest(
+        ctx,
+        { key: project.publicKey },
+        { envelope: envelope() },
+      );
+      expect(res.status).toBe(201);
+      const body = ingestSchema.parse(await res.json());
+
+      const wrongKey = headers({ key: other.publicKey });
+      const put = await ctx.app.request(
+        `/api/v1/capture/uploads/${body.reportId}/${body.uploads[0].key}`,
+        { method: "PUT", headers: wrongKey, body: BYTES },
+      );
+      expect(put.status).toBe(404);
+
+      const fin = await ctx.app.request(
+        `/api/v1/capture/reports/${body.reportId}/finalize`,
+        { method: "POST", headers: wrongKey },
+      );
+      expect(fin.status).toBe(404);
+    } finally {
+      await ctx.stop();
+    }
+  }, 120_000);
 });

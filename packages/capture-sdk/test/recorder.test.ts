@@ -72,7 +72,7 @@ describe("Recorder", () => {
     expect(replay).toEqual([{ t: 1 }]);
   });
 
-  test("console patch pushes event and preserves passthrough", () => {
+  test("console patch pushes renderer-shaped event and preserves passthrough", () => {
     let calledWith: unknown[] | undefined;
     const orig = console.error;
     console.error = (...a: unknown[]) => {
@@ -82,13 +82,25 @@ describe("Recorder", () => {
     rec.start();
     console.error("boom", { a: 1 });
     const [ev] = kind(rec.events, "console");
-    expect(ev.title).toBe("error");
+    // renderer.js reads ev.level for the row class and detail.message for the body
+    expect(ev.level).toBe("error");
+    expect(ev.title).toBe('["boom",{"a":1}]');
     expect(ev.detail.level).toBe("error");
-    expect(JSON.parse(String(ev.detail.args))).toEqual(["boom", { a: 1 }]);
+    expect(ev.detail.message).toBe('["boom",{"a":1}]');
+    expect(ev.detail.stack).toEqual([]);
     expect(calledWith).toEqual(["boom", { a: 1 }]);
     rec.stop();
     expect(console.error).not.toBe(orig); // restores the spy, not the original
     console.error = orig;
+  });
+
+  test("console.warn maps to extension 'warning' level", () => {
+    const rec = new Recorder({}, stubRecord);
+    rec.start();
+    console.warn("careful");
+    const [ev] = kind(rec.events, "console");
+    expect(ev.level).toBe("warning");
+    rec.stop();
   });
 
   test("fetch wrap: passthrough + redacted network event", async () => {
@@ -126,8 +138,17 @@ describe("Recorder", () => {
       method: "POST",
       url: "https://api.dev/x?token=[redacted]",
       status: 201,
-      responseBody: '{"ok":true}',
     });
+    // responseBody lands after the response resolves (async clone capture) —
+    // yield event-loop turns until the clone's text() settles; bounded, no sleeps.
+    const turn = () => {
+      const { promise, resolve } = Promise.withResolvers<void>();
+      setImmediate(resolve);
+      return promise;
+    };
+    for (let i = 0; i < 20 && ev.detail.responseBody === undefined; i++)
+      await turn();
+    expect(ev.detail.responseBody).toBe('{"ok":true}');
     const reqH = ev.detail.requestHeaders as Record<string, string>;
     expect(reqH.authorization).toBe("[redacted]");
     const resH = ev.detail.responseHeaders as Record<string, string>;
@@ -162,6 +183,26 @@ describe("Recorder", () => {
     const [ev] = kind(rec.events, "network");
     expect(ev.detail.error).toBe("conn refused");
     rec.stop();
+  });
+
+  test("fetch wrap: streaming response resolves without awaiting body", async () => {
+    // SSE-style response whose body never ends — the wrap must return the
+    // response at header-arrival, not after reading the body.
+    globalThis.fetch = (() =>
+      Promise.resolve(
+        new Response(
+          new ReadableStream({ start: () => {} }), // never enqueues, never closes
+          { status: 200, headers: { "content-type": "text/event-stream" } },
+        ),
+      )) as typeof fetch;
+    const rec = new Recorder({}, stubRecord);
+    rec.start();
+    const res = await fetch("https://api.dev/stream"); // hangs forever pre-fix
+    expect(res.status).toBe(200);
+    const [ev] = kind(rec.events, "network"); // event pushed at header-arrival
+    expect(ev.detail.status).toBe(200);
+    rec.stop();
+    // the clone's dangling body read holds no handles; no cleanup needed
   });
 
   test("XHR wrap pushes network event with captured headers", () => {
@@ -265,14 +306,41 @@ describe("Recorder", () => {
     else g.FormData = savedFormData;
   });
 
-  test("window error listener pushes error event", () => {
+  test("window error listener pushes renderer-shaped error event", () => {
     const rec = new Recorder({}, stubRecord);
     rec.start();
+    const err = new Error("kaboom");
+    err.stack = "Error: kaboom\n    at f (a.js:3:7)";
     for (const l of listeners.error ?? [])
-      l({ message: "oops", filename: "a.js", lineno: 3, colno: 7 });
+      l({ message: "oops", filename: "a.js", lineno: 3, colno: 7, error: err });
     const [ev] = kind(rec.events, "error");
+    expect(ev.level).toBe("error");
     expect(ev.title).toBe("oops");
-    expect(ev.detail).toMatchObject({ source: "a.js", lineno: 3, colno: 7 });
+    // renderer iterates detail.stack.forEach — must be string[]
+    expect(ev.detail).toEqual({
+      message: "oops",
+      url: "a.js",
+      line: 3,
+      column: 7,
+      stack: ["Error: kaboom", "    at f (a.js:3:7)"],
+    });
+    rec.stop();
+  });
+
+  test("unhandledrejection pushes error event with stack array", () => {
+    const rec = new Recorder({}, stubRecord);
+    rec.start();
+    const err = new Error("async fail");
+    err.stack = "Error: async fail\n    at g (b.js:1:1)";
+    for (const l of listeners.unhandledrejection ?? []) l({ reason: err });
+    const [ev] = kind(rec.events, "error");
+    expect(ev.level).toBe("error");
+    expect(ev.title).toBe("unhandledrejection: async fail");
+    expect(ev.detail.message).toBe("unhandledrejection: async fail");
+    expect(ev.detail.stack).toEqual([
+      "Error: async fail",
+      "    at g (b.js:1:1)",
+    ]);
     rec.stop();
   });
 

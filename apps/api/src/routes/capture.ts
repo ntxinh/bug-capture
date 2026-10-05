@@ -113,7 +113,7 @@ export function captureRoutes(
       reportId,
       key,
       c.req.header("content-length"),
-      await c.req.arrayBuffer(),
+      c.req.raw,
     );
   });
 

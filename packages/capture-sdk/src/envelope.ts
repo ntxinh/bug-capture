@@ -5,6 +5,8 @@ export interface OjEvent {
   /** ms since recorder start. */
   rel: number;
   kind: "console" | "network" | "error" | "meta" | (string & {});
+  /** Severity, set on console/error events (extension renderer reads `ev.level`). */
+  level?: string;
   title: string;
   detail: Record<string, unknown>;
 }

@@ -98,10 +98,22 @@ export class Recorder {
     this.recordFn = recordFn;
   }
 
-  private push(kind: OjEvent["kind"], title: string, detail: AnyRec): void {
+  private push(
+    kind: OjEvent["kind"],
+    title: string,
+    detail: AnyRec,
+    level?: string,
+  ): void {
     if (!this.running) return;
     const t = Date.now();
-    this.events.push({ t, rel: t - this.startWall, kind, title, detail });
+    this.events.push({
+      t,
+      rel: t - this.startWall,
+      kind,
+      level,
+      title,
+      detail,
+    });
     if (this.events.length > this.maxEvents) this.events.shift();
   }
 
@@ -146,7 +158,10 @@ export class Recorder {
       const orig = c[level];
       const self = this;
       c[level] = function (this: unknown, ...args: unknown[]) {
-        self.push("console", level, { level, args: safeStringify(args, 8192) });
+        // Extension contract: top-level `level`, detail { message, stack[] }.
+        const message = safeStringify(args, 8192);
+        const lvl = level === "warn" ? "warning" : level;
+        self.push("console", message, { level: lvl, message, stack: [] }, lvl);
         return orig.apply(console, args);
       };
       this.restore.push(() => {
@@ -186,14 +201,20 @@ export class Recorder {
         detail.status = res.status;
         detail.durationMs = Date.now() - t0;
         detail.responseHeaders = redactHeaders(headersToObject(res.headers));
-        // clone() tees the stream so the caller still gets the body; skipped
-        // for binary/oversized payloads.
-        if (TEXTUAL.test(res.headers.get("content-type") ?? "")) {
-          const text = await res.clone().text();
-          if (text.length <= this.maxBodyBytes)
-            detail.responseBody = redactBody(text);
-        }
         this.push("network", `${method} ${url}`, detail);
+        // clone() tees the stream so the caller still gets the body; captured
+        // in the background so streaming responses aren't held open — the
+        // event object is mutated in place once the body lands.
+        if (TEXTUAL.test(res.headers.get("content-type") ?? "")) {
+          res
+            .clone()
+            .text()
+            .then((text) => {
+              if (text.length <= this.maxBodyBytes)
+                detail.responseBody = redactBody(text);
+            })
+            .catch(() => {}); // body unreadable → leave absent
+        }
         return res;
       } catch (err) {
         detail.durationMs = Date.now() - t0;
@@ -304,19 +325,36 @@ export class Recorder {
       lineno?: number;
       colno?: number;
       error?: unknown;
-    }) =>
-      this.push("error", String(e.message ?? "error"), {
-        stack: stackOf(e.error),
-        source: e.filename,
-        lineno: e.lineno,
-        colno: e.colno,
-      });
-    const onRejection = (e: { reason?: unknown }) =>
+    }) => {
+      // Extension contract: detail { message, url, line, column, stack[] }.
+      const message = String(e.message ?? "error");
+      const stack = stackOf(e.error);
       this.push(
         "error",
-        `unhandledrejection: ${e.reason instanceof Error ? e.reason.message : String(e.reason)}`,
-        { stack: stackOf(e.reason) },
+        message.split("\n")[0],
+        {
+          message,
+          url: e.filename,
+          line: e.lineno,
+          column: e.colno,
+          stack: stack ? stack.split("\n") : [],
+        },
+        "error",
       );
+    };
+    const onRejection = (e: { reason?: unknown }) => {
+      const reason = e.reason;
+      const message = `unhandledrejection: ${
+        reason instanceof Error ? reason.message : String(reason)
+      }`;
+      const stack = stackOf(reason);
+      this.push(
+        "error",
+        message.split("\n")[0],
+        { message, stack: stack ? stack.split("\n") : [] },
+        "error",
+      );
+    };
     evTarget.addEventListener("error", onError);
     evTarget.addEventListener("unhandledrejection", onRejection);
     this.restore.push(() => {
