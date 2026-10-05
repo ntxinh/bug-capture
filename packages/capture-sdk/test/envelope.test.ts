@@ -93,4 +93,25 @@ describe("buildEnvelope", () => {
     });
     expect(envelope.summary.description).toBe("");
   });
+
+  test("sha256 falls back to pure-TS impl when crypto.subtle is absent (http://)", async () => {
+    const g = globalThis as { crypto?: unknown };
+    const saved = g.crypto;
+    g.crypto = undefined;
+    try {
+      const { envelope } = await buildEnvelope({
+        events: [],
+        replayBytes,
+        meta: META,
+        capturedAt: 0,
+        durationMs: 0,
+      });
+      // same known vector as the subtle path (sha256 of "[]")
+      expect(envelope.artifacts[0].sha256).toBe(
+        "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      );
+    } finally {
+      g.crypto = saved;
+    }
+  });
 });

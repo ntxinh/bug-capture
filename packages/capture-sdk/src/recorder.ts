@@ -19,11 +19,27 @@ type AnyRec = Record<string, unknown>;
 
 /** Minimal XHR surface the wrap touches; avoids the DOM lib. */
 interface XhrLike {
-  __oj?: { method: string; url: string };
+  __oj?: {
+    method: string;
+    url: string;
+    requestHeaders?: Record<string, string>;
+  };
   status: number;
   responseText: unknown;
   getResponseHeader(name: string): string | null;
+  getAllResponseHeaders(): string;
   addEventListener(type: string, cb: () => void): void;
+}
+
+/** `getAllResponseHeaders()` returns `name: value\r\n` lines → object. */
+function parseXhrHeaders(raw: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const line of raw.split("\r\n")) {
+    const i = line.indexOf(":");
+    if (i > 0)
+      out[line.slice(0, i).trim().toLowerCase()] = line.slice(i + 1).trim();
+  }
+  return out;
 }
 
 function headersToObject(h: unknown): Record<string, string> {
@@ -197,7 +213,7 @@ export class Recorder {
     const xhr = g.XMLHttpRequest;
     if (typeof xhr !== "function") return;
     const proto = xhr.prototype as AnyRec;
-    const { open, send } = proto;
+    const { open, send, setRequestHeader } = proto;
     if (typeof open !== "function" || typeof send !== "function") return;
     const self = this;
     proto.open = function (
@@ -209,25 +225,53 @@ export class Recorder {
       this.__oj = { method, url: String(url) };
       return open.call(this, method, url, ...rest);
     };
+    if (typeof setRequestHeader === "function")
+      proto.setRequestHeader = function (
+        this: XhrLike,
+        name: string,
+        value: string,
+      ) {
+        if (!this.__oj) this.__oj = { method: "GET", url: "" };
+        const oj = this.__oj;
+        if (!oj.requestHeaders) oj.requestHeaders = {};
+        oj.requestHeaders[String(name).toLowerCase()] = String(value);
+        return setRequestHeader.call(this, name, value);
+      };
     proto.send = function (this: XhrLike, body?: unknown) {
       const m = this.__oj;
       const method = m?.method ?? "GET";
       const url = redactUrl(m?.url ?? "");
       const t0 = Date.now();
-      const detail: AnyRec = { method, url };
-      if (typeof body === "string" && body.length <= self.maxBodyBytes)
-        detail.requestBody = redactBody(body);
+      const requestHeaders = redactHeaders(m?.requestHeaders ?? {});
+      const detail: AnyRec = { method, url, requestHeaders };
+      const isFormData = body != null && body.constructor?.name === "FormData";
+      const bodyText =
+        typeof body === "string"
+          ? body
+          : body != null && body.constructor?.name === "URLSearchParams"
+            ? body.toString()
+            : undefined;
+      if (isFormData) detail.requestBody = "[formdata]";
+      else if (
+        bodyText != null &&
+        bodyText.length <= self.maxBodyBytes &&
+        TEXTUAL.test(requestHeaders["content-type"] ?? "application/json")
+      )
+        detail.requestBody = redactBody(bodyText);
       const done = () => {
         detail.status = this.status;
         detail.durationMs = Date.now() - t0;
         try {
+          detail.responseHeaders = redactHeaders(
+            parseXhrHeaders(this.getAllResponseHeaders() ?? ""),
+          );
           if (TEXTUAL.test(this.getResponseHeader("content-type") ?? "")) {
             const text = this.responseText;
             if (typeof text === "string" && text.length <= self.maxBodyBytes)
               detail.responseBody = redactBody(text);
           }
         } catch {
-          /* responseText throws for binary responseTypes */
+          /* header/responseText access throws for some responseTypes */
         }
         self.push("network", `${method} ${url}`, detail);
       };
@@ -237,6 +281,8 @@ export class Recorder {
     this.restore.push(() => {
       proto.open = open;
       proto.send = send;
+      if (typeof setRequestHeader === "function")
+        proto.setRequestHeader = setRequestHeader;
     });
   }
 

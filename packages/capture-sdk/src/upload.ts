@@ -67,13 +67,14 @@ export function initOpenJam(
         reportId: string;
         uploads: UploadTarget[];
       };
-      // Upload URLs are pre-authed (presigned or public capture route) — the
-      // URL itself is the credential, no extra auth header.
+      // The capture route's use("*") middleware resolves x-openjam-key — the
+      // URL alone is not the credential. S3 presigned PUTs ignore the extra
+      // header (auth is in the query), so sending it unconditionally is safe.
       await Promise.all(
         uploads.map(async (u, i) => {
           const put = await fetch(u.url, {
             method: "PUT",
-            headers: u.headers ?? {},
+            headers: { ...u.headers, ...keyHeaders },
             body: artifacts[i].bytes,
           });
           if (!put.ok) throw await uploadError("artifact upload", put);

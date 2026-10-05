@@ -164,18 +164,24 @@ describe("Recorder", () => {
     rec.stop();
   });
 
-  test("XHR wrap pushes network event", () => {
+  test("XHR wrap pushes network event with captured headers", () => {
     class FakeXHR {
       status = 0;
       responseText = "";
       private cbs: (() => void)[] = [];
+      private reqH: Record<string, string> = {};
       open(_m: string, _u: string) {}
-      setRequestHeader(_k: string, _v: string) {}
+      setRequestHeader(k: string, v: string) {
+        this.reqH[k] = v;
+      }
       addEventListener(_t: string, cb: () => void) {
         this.cbs.push(cb);
       }
       getResponseHeader(n: string) {
         return n === "content-type" ? "application/json" : null;
+      }
+      getAllResponseHeaders() {
+        return "content-type: application/json\r\nset-cookie: sid=1\r\n";
       }
       send(_b?: unknown) {
         // fire loadend synchronously so the event lands before stop()
@@ -191,6 +197,8 @@ describe("Recorder", () => {
     rec.start();
     const xhr = new FakeXHR();
     xhr.open("POST", "https://api.dev/xhr?token=zzz");
+    xhr.setRequestHeader("Authorization", "Bearer s3cret");
+    xhr.setRequestHeader("Content-Type", "application/json");
     xhr.send('{"x":2}');
     const [ev] = kind(rec.events, "network"); // read before stop() drains
     rec.stop();
@@ -198,8 +206,63 @@ describe("Recorder", () => {
     expect(ev.detail.requestBody).toBe('{"x":2}');
     expect(ev.detail.status).toBe(200);
     expect(ev.detail.responseBody).toBe('{"done":1}');
+    const reqH = ev.detail.requestHeaders as Record<string, string>;
+    expect(reqH.authorization).toBe("[redacted]");
+    expect(reqH["content-type"]).toBe("application/json");
+    const resH = ev.detail.responseHeaders as Record<string, string>;
+    expect(resH["content-type"]).toBe("application/json");
+    expect(resH["set-cookie"]).toBe("[redacted]");
     if (savedXhr === undefined) delete g.XMLHttpRequest;
     else g.XMLHttpRequest = savedXhr;
+  });
+
+  test("XHR wrap: FormData body → [formdata], non-textual request body skipped", () => {
+    class FakeXHR {
+      status = 200;
+      responseText = "ok";
+      private cbs: (() => void)[] = [];
+      open(_m: string, _u: string) {}
+      setRequestHeader(_k: string, _v: string) {}
+      addEventListener(_t: string, cb: () => void) {
+        this.cbs.push(cb);
+      }
+      getResponseHeader(_n: string) {
+        return null;
+      }
+      getAllResponseHeaders() {
+        return "";
+      }
+      send(_b?: unknown) {
+        for (const c of this.cbs) c();
+      }
+    }
+    const g = globalThis as Record<string, unknown>;
+    const savedXhr = g.XMLHttpRequest;
+    const savedFormData = g.FormData;
+    g.XMLHttpRequest = FakeXHR;
+    g.FormData = class FormData {}; // no DOM FormData under bun-types
+    const rec = new Recorder({}, stubRecord);
+    rec.start();
+    const fd = new (g.FormData as new () => unknown)();
+    const xhr1 = new FakeXHR();
+    xhr1.open("POST", "https://api.dev/fd");
+    xhr1.send(fd);
+    const xhr2 = new FakeXHR();
+    xhr2.open("POST", "https://api.dev/blob");
+    xhr2.send(new Uint8Array([1, 2]));
+    const xhr3 = new FakeXHR();
+    xhr3.open("POST", "https://api.dev/q");
+    xhr3.setRequestHeader("Content-Type", "text/plain");
+    xhr3.send(new URLSearchParams("a=1&b=2"));
+    const evs = kind(rec.events, "network");
+    rec.stop();
+    expect(evs[0].detail.requestBody).toBe("[formdata]");
+    expect(evs[1].detail.requestBody).toBeUndefined();
+    expect(evs[2].detail.requestBody).toBe("a=1&b=2");
+    if (savedXhr === undefined) delete g.XMLHttpRequest;
+    else g.XMLHttpRequest = savedXhr;
+    if (savedFormData === undefined) delete g.FormData;
+    else g.FormData = savedFormData;
   });
 
   test("window error listener pushes error event", () => {

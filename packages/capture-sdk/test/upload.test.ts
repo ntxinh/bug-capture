@@ -108,10 +108,9 @@ describe("initOpenJam", () => {
 
     expect(puts).toHaveLength(1);
     expect(puts[0].url).toBe("https://api.dev/api/v1/capture/uploads/r1/k1");
-    expect(puts[0].headers ?? {}).not.toHaveProperty("x-openjam-key");
+    expect(puts[0].headers?.["x-openjam-key"]).toBe("pk_test");
     const bytes = puts[0].body as Uint8Array;
     expect(bytes.length).toBe(sent.envelope.artifacts[0].sizeBytes);
-
     expect(fin.url).toBe("https://api.dev/api/v1/capture/reports/r1/finalize");
     expect(fin.headers?.["x-openjam-key"]).toBe("pk_test");
   });
@@ -142,7 +141,10 @@ describe("initOpenJam", () => {
     const session = initOpenJam(CFG, stubRecord);
     await session.submit();
     const put = calls.find((c) => c.method === "PUT");
-    expect(put?.headers).toMatchObject({ "x-amz-meta-sha": "abc" });
+    expect(put?.headers).toMatchObject({
+      "x-amz-meta-sha": "abc",
+      "x-openjam-key": "pk_test",
+    });
   });
 
   test("ingest failure throws with status", async () => {
