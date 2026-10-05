@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Report — bug-capture</title>
+    <link rel="stylesheet" href="/ext/dist/rrweb-replay.css" />
+    <style>
+      html,
+      body {
+        height: 100%;
+      }
+      #scroll {
+        flex: 1;
+        overflow: auto;
+      }
+      #bar {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 16px;
+        border-bottom: 1px solid #2a2f3a;
+        background: #141821;
+      }
+      #bar .spacer {
+        flex: 1;
+      }
+      #bar a {
+        color: #6ea8fe;
+        text-decoration: none;
+        font: 600 13px system-ui, sans-serif;
+      }
+      .err {
+        margin: 24px 20px;
+        padding: 14px 16px;
+        border: 1px solid #f85149;
+        border-radius: 9px;
+        background: rgba(248, 81, 73, 0.14);
+        color: #ff8078;
+        font: 600 13px system-ui, sans-serif;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="bar">
+      <strong>bug-capture</strong>
+      <span class="spacer"></span>
+      <a href="/app/">← Dashboard</a>
+    </div>
+    <div id="scroll">
+      <div id="replay-section" hidden>
+        <h2>Session replay</h2>
+        <div id="replay"></div>
+      </div>
+      <div id="audio-section" hidden>
+        <h2>Narration</h2>
+        <div id="audio"></div>
+      </div>
+      <div id="app"></div>
+    </div>
+    <script src="/ext/dist/rrweb-replay.js"></script>
+    <script src="/ext/waveform.js"></script>
+    <script type="module" src="/app/report.js"></script>
+  </body>
+</html>

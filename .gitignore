@@ -12,3 +12,6 @@ apps/extension/openjam.zip
 # playwright
 apps/extension/test-results/
 apps/extension/playwright-report/
+
+# dev-api local artifact store
+apps/api/data/
