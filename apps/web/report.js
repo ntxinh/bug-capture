@@ -5,9 +5,9 @@
 import {
   mountAudio,
   mountReplay,
-  renderReport,
   REPLAY_CSS,
   REPORT_CSS,
+  renderReport,
 } from "/ext/renderer.js";
 
 const $ = (id) => document.getElementById(id);
@@ -69,7 +69,10 @@ if (!id) {
       (a) => a.type === "replay" && uploaded(a),
     );
     try {
-      if (replay) report.rrwebEvents = await fetch(replay.downloadUrl).then((r) => r.json());
+      if (replay)
+        report.rrwebEvents = await fetch(replay.downloadUrl).then((r) =>
+          r.json(),
+        );
       if (audio) {
         const blob = await fetch(audio.downloadUrl).then((r) => r.blob());
         const t = env.meta?.audio ?? {};

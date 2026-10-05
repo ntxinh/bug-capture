@@ -22,7 +22,10 @@ async function ensureOrg(name, email) {
   const orgs = await api("/api/auth/organization/list");
   let orgId = orgs?.[0]?.id;
   if (!orgId) {
-    const slug = `${email.split("@")[0].toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${Date.now().toString(36)}`;
+    const slug = `${email
+      .split("@")[0]
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")}-${Date.now().toString(36)}`;
     const org = await api("/api/auth/organization/create", {
       method: "POST",
       body: JSON.stringify({ name: name || slug, slug }),

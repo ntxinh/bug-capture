@@ -28,3 +28,6 @@ diagram, §3 core abstractions, §8 remote flow).
 - `@bugcapture/storage` `ArtifactStorage`: local fs (`ARTIFACT_DIR`) or S3
   presign (`S3_*`); PAT `Bearer` auth in `requireAuth`; uploads two-phase —
   ingest → `PUT` artifact bytes → finalize.
+- Static mounts on the API: `/app` → `apps/web` SPA (session cookie),
+  `/ext` → `apps/extension` statics (`dist/rrweb-replay.*` for the report
+  viewer). PAT `Bearer` is for non-browser clients only.

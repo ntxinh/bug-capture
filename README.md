@@ -52,6 +52,14 @@ two-phase: `POST /api/v1/reports/ingest` → `PUT` each artifact's bytes →
 `POST /api/v1/reports/:id/finalize`. Artifacts land on local disk
 (`ARTIFACT_DIR`) or S3 via presigned URLs (`S3_*` env).
 
+## Dashboard (Phase 5)
+
+`make dev-api` serves the SPA at `http://localhost:3000/app` — sign up →
+create org → create project → mint a PAT (`POST /api/v1/tokens`). Set that
+PAT in the extension viewer's upload config and upload; open the report at
+`/app/report.html?id=…`. `/app` uses the session cookie; PAT `Bearer` is
+for non-browser clients only.
+
 ## Docs
 
 - `DESIGN.md` — product design (working spec)
