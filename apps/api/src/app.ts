@@ -1,6 +1,7 @@
 import type { Db } from "@bugcapture/db";
 import type { ArtifactStorage } from "@bugcapture/storage";
 import { Hono } from "hono";
+import { serveStatic } from "hono/bun";
 import type { Auth } from "./lib/auth";
 import { captureSessionsRoutes } from "./routes/capture-sessions";
 import { ingestRoutes } from "./routes/ingest";
@@ -28,5 +29,22 @@ export function buildApp(
   app.route("/api/v1/capture-sessions", captureSessionsRoutes(db, auth));
   app.route("/api/v1/tokens", tokensRoutes(db, auth));
   app.route("/api/v1", ingestRoutes(db, auth, storage));
+  // static mounts — roots resolve relative to apps/api cwd (make dev-api)
+  app.use(
+    "/app/*",
+    serveStatic({
+      root: "../web",
+      rewriteRequestPath: (p) => p.replace(/^\/app/, ""),
+    }),
+  );
+  app.use(
+    "/ext/*",
+    serveStatic({
+      root: "../extension",
+      rewriteRequestPath: (p) => p.replace(/^\/ext/, ""),
+    }),
+  );
+  app.get("/app", (c) => c.redirect("/app/index.html"));
+  app.get("/", (c) => c.redirect("/app/"));
   return app;
 }

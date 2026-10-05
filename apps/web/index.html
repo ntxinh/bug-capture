@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>bug-capture</title>
+    <link rel="stylesheet" href="/app/style.css" />
+  </head>
+  <body>
+    <main>
+      <h1>bug-capture</h1>
+      <section id="auth">
+        <h2>Sign in</h2>
+        <form id="auth-form">
+          <input name="name" placeholder="Name (sign up only)" />
+          <input name="email" type="email" required placeholder="Email" />
+          <input name="password" type="password" required placeholder="Password" />
+          <button>Continue</button>
+        </form>
+        <p id="auth-error" class="error"></p>
+      </section>
+      <section id="projects" class="hidden">
+        <h2>Projects</h2>
+        <ul id="project-list"></ul>
+        <form id="project-form">
+          <input name="name" required placeholder="Project name" />
+          <input
+            name="slug"
+            required
+            placeholder="slug"
+            pattern="[a-z0-9-]+"
+          />
+          <button>Create</button>
+        </form>
+        <p id="project-error" class="error"></p>
+      </section>
+      <section id="reports" class="hidden">
+        <h2>Reports — <span id="reports-project"></span></h2>
+        <button id="reports-back">← Projects</button>
+        <table>
+          <thead>
+            <tr>
+              <th>Title</th>
+              <th>Status</th>
+              <th>Priority</th>
+              <th>Created</th>
+            </tr>
+          </thead>
+          <tbody id="report-rows"></tbody>
+        </table>
+      </section>
+      <p id="global-error" class="error"></p>
+    </main>
+    <script type="module" src="/app/index.js"></script>
+  </body>
+</html>
