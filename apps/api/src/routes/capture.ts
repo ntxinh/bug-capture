@@ -11,6 +11,7 @@ import {
   handleIngest,
   handleUploadPut,
 } from "../lib/ingest-shared";
+import { rateLimiter } from "../lib/rate-limit";
 import { zjson } from "../lib/validate";
 
 type Project = typeof projects.$inferSelect;
@@ -76,6 +77,9 @@ export function captureRoutes(
       maxAge: 600,
     }),
   );
+
+  // Rate limit ahead of auth — the limiter skips OPTIONS itself.
+  r.use("*", rateLimiter());
 
   r.use("*", async (c, next) => {
     const p = await resolveKey(db, c);
