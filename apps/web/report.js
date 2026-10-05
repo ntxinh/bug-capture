@@ -68,14 +68,20 @@ if (!id) {
     const replay = rep.artifacts?.find(
       (a) => a.type === "replay" && uploaded(a),
     );
-    if (replay)
-      report.rrwebEvents = await fetch(replay.downloadUrl).then((r) =>
-        r.json(),
-      );
-    const audio = rep.artifacts?.find((a) => a.type === "audio" && uploaded(a));
-    if (audio) {
-      const blob = await fetch(audio.downloadUrl).then((r) => r.blob());
-      report.audio = { dataUrl: await blobToDataUrl(blob) };
+    try {
+      if (replay) report.rrwebEvents = await fetch(replay.downloadUrl).then((r) => r.json());
+      if (audio) {
+        const blob = await fetch(audio.downloadUrl).then((r) => r.blob());
+        const t = env.meta?.audio ?? {};
+        report.audio = {
+          dataUrl: await blobToDataUrl(blob),
+          startWall: t.startWall,
+          durationMs: t.durationMs,
+        };
+      }
+    } catch (err) {
+      console.warn("artifact fetch failed", err);
+      report.rrwebEvents = report.rrwebEvents || [];
     }
 
     renderReport($("app"), report);
@@ -88,7 +94,12 @@ if (!id) {
     );
     if (hasReplay) {
       $("replay-section").hidden = false; // visible BEFORE mount so it measures
-      mountReplay($("replay"), report, ReplayerCtor);
+      try {
+        mountReplay($("replay"), report, ReplayerCtor);
+      } catch (err) {
+        console.error("replay mount failed", err);
+        $("replay-section").hidden = true;
+      }
     }
     // Standalone narration only when no replay exists to drive it in sync.
     if (!hasReplay && report.audio?.dataUrl) {

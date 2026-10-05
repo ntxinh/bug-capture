@@ -42,7 +42,15 @@ export async function uploadReport(report, { apiUrl, token, projectId, environme
   const envelope = {
     schemaVersion: 2,
     summary: { title: r.meta?.pageTitle || r.meta?.pageUrl || "capture", url: r.meta?.pageUrl },
-    meta: { ...r.meta, device: r.device },
+    meta: {
+      ...r.meta,
+      device: r.device,
+      // audio wall-clock fields the player needs for replay-synced narration
+      // (artifact descriptor schema is fixed — timing rides inside meta).
+      audio: r.audio
+        ? { startWall: r.audio.startWall, durationMs: r.audio.durationMs, mime: r.audio.mime }
+        : undefined,
+    },
     events: r.events,
     artifacts: artifacts.map(({ bytes, ...d }) => d),
   };
