@@ -156,12 +156,12 @@ export function ingestRoutes(db: Db, auth: Auth, storage: ArtifactStorage) {
     return c.json({ reportId, uploads }, 201);
   });
 
-  // Local-store upload sink; S3 mode clients PUT to the presigned url so this
-  // route simply never matches a minted key.
-  r.put("/uploads/:reportId/:key", async (c) => {
-    const { reportId, key } = c.req.param();
-    if (!SAFE_SEGMENT.test(reportId) || !SAFE_SEGMENT.test(key))
-      return c.json({ error: "not found" }, 404);
+  // artifact row + owning-org report shared by the upload/download pair.
+  const findArtifactForOrg = async (
+    reportId: string,
+    key: string,
+    orgId: string,
+  ) => {
     const [artifact] = await db
       .select()
       .from(reportArtifacts)
@@ -171,13 +171,22 @@ export function ingestRoutes(db: Db, auth: Auth, storage: ArtifactStorage) {
           eq(reportArtifacts.storageKey, key),
         ),
       );
-    if (!artifact) return c.json({ error: "not found" }, 404);
+    if (!artifact) return null;
     const [rep] = await db
       .select({ organizationId: reports.organizationId })
       .from(reports)
       .where(eq(reports.id, artifact.reportId));
-    if (!rep || rep.organizationId !== c.var.orgId)
+    return rep && rep.organizationId === orgId ? artifact : null;
+  };
+
+  // Local-store upload sink; S3 mode clients PUT to the presigned url so this
+  // route simply never matches a minted key.
+  r.put("/uploads/:reportId/:key", async (c) => {
+    const { reportId, key } = c.req.param();
+    if (!SAFE_SEGMENT.test(reportId) || !SAFE_SEGMENT.test(key))
       return c.json({ error: "not found" }, 404);
+    const artifact = await findArtifactForOrg(reportId, key, c.var.orgId);
+    if (!artifact) return c.json({ error: "not found" }, 404);
     const declared = c.req.header("content-length");
     if (declared != null && Number(declared) !== artifact.sizeBytes)
       return c.json({ error: "size mismatch" }, 413);
@@ -191,6 +200,24 @@ export function ingestRoutes(db: Db, auth: Auth, storage: ArtifactStorage) {
       return c.json({ error: "checksum mismatch" }, 409);
     await storage.write(reportId, key, body);
     return c.json({ ok: true });
+  });
+
+  r.get("/uploads/:reportId/:key", async (c) => {
+    const { reportId, key } = c.req.param();
+    if (!SAFE_SEGMENT.test(reportId) || !SAFE_SEGMENT.test(key))
+      return c.json({ error: "not found" }, 404);
+    const artifact = await findArtifactForOrg(reportId, key, c.var.orgId);
+    if (!artifact) return c.json({ error: "not found" }, 404);
+    if (storage instanceof LocalFsStorage) {
+      const body = await storage.read(reportId, key).catch(() => null);
+      if (!body) return c.json({ error: "not found" }, 404);
+      return new Response(body, {
+        headers: {
+          "content-type": artifact.contentType ?? "application/octet-stream",
+        },
+      });
+    }
+    return c.redirect(await storage.getDownloadUrl(reportId, key), 302);
   });
 
   r.post("/reports/:id/finalize", async (c) => {

@@ -4,15 +4,16 @@ import { join } from "node:path";
 import { createDb, type Db, migrate } from "@bugcapture/db";
 import { LocalFsStorage } from "@bugcapture/storage";
 import { PostgreSqlContainer } from "@testcontainers/postgresql";
-import { buildApp } from "../src/app";
+import { type App, buildApp } from "../src/app";
 import { createAuth } from "../src/lib/auth";
 
 process.env.TESTCONTAINERS_RYUK_DISABLED ??= "true";
 process.env.DOCKER_HOST ??= `unix:///run/user/${process.getuid()}/podman/podman.sock`;
 
 export interface TestCtx {
-  app: ReturnType<typeof buildApp>;
+  app: App;
   db: Db;
+  storage: LocalFsStorage;
   stop: () => Promise<void>;
 }
 
@@ -27,11 +28,11 @@ export async function withTestDb(): Promise<TestCtx> {
     "http://localhost:3000",
   );
   const app = buildApp(db, auth, "http://localhost:3000", storage);
-  return { app, db, stop: () => container.stop() };
+  return { app, db, storage, stop: () => container.stop() };
 }
 
 export async function signUpAndOrg(
-  app: ReturnType<typeof buildApp>,
+  app: App,
   email = "a@t.dev",
   password = "password123!",
 ) {

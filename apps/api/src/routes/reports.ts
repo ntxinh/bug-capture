@@ -6,7 +6,8 @@ import {
   reportShares,
   reports,
 } from "@bugcapture/db/schema";
-import { and, eq } from "drizzle-orm";
+import type { ArtifactStorage } from "@bugcapture/storage";
+import { and, desc, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 import type { Auth } from "../lib/auth";
@@ -31,7 +32,7 @@ const patchReport = z.object({
   assignedTo: z.string().min(1).nullish(),
 });
 
-export function reportsRoutes(db: Db, auth: Auth) {
+export function reportsRoutes(db: Db, auth: Auth, storage: ArtifactStorage) {
   const r = new Hono();
   r.use("*", requireAuth(auth, db));
 
@@ -72,10 +73,32 @@ export function reportsRoutes(db: Db, auth: Auth) {
     if (projectId) conds.push(eq(reports.projectId, projectId));
     if (status) conds.push(eq(reports.status, status));
     if (assignedTo) conds.push(eq(reports.assignedTo, assignedTo));
+    // dashboard list payload: every scalar column, never the raw envelope blob.
     const rows = await db
-      .select()
+      .select({
+        id: reports.id,
+        organizationId: reports.organizationId,
+        projectId: reports.projectId,
+        environmentId: reports.environmentId,
+        title: reports.title,
+        description: reports.description,
+        status: reports.status,
+        priority: reports.priority,
+        createdBy: reports.createdBy,
+        assignedTo: reports.assignedTo,
+        captureSessionId: reports.captureSessionId,
+        source: reports.source,
+        captureMode: reports.captureMode,
+        startedAt: reports.startedAt,
+        endedAt: reports.endedAt,
+        appVersion: reports.appVersion,
+        gitSha: reports.gitSha,
+        createdAt: reports.createdAt,
+        updatedAt: reports.updatedAt,
+      })
       .from(reports)
-      .where(and(...conds));
+      .where(and(...conds))
+      .orderBy(desc(reports.createdAt));
     return c.json(rows);
   });
 
@@ -85,7 +108,15 @@ export function reportsRoutes(db: Db, auth: Auth) {
     const artifacts = await db
       .select()
       .from(reportArtifacts)
-      .where(eq(reportArtifacts.reportId, rep.id));
+      .where(eq(reportArtifacts.reportId, rep.id))
+      .then((rows) =>
+        Promise.all(
+          rows.map(async (a) => ({
+            ...a,
+            downloadUrl: await storage.getDownloadUrl(rep.id, a.storageKey),
+          })),
+        ),
+      );
     const shares = await db
       .select({
         id: reportShares.id,
@@ -133,7 +164,16 @@ export function reportsRoutes(db: Db, auth: Auth) {
       !(await isAdmin(db, c.var.user.id, c.var.orgId))
     )
       return c.json({ error: "forbidden" }, 403);
+    const arts = await db
+      .select({ storageKey: reportArtifacts.storageKey })
+      .from(reportArtifacts)
+      .where(eq(reportArtifacts.reportId, rep.id));
     await db.delete(reports).where(eq(reports.id, rep.id));
+    // storage cleanup is best-effort: report is gone either way.
+    for (const res of await Promise.allSettled(
+      arts.map((a) => storage.delete(rep.id, a.storageKey)),
+    ))
+      if (res.status === "rejected") console.warn("artifact sweep", res.reason);
     return c.body(null, 204);
   });
 

@@ -1,5 +1,11 @@
 import { describe, expect, it } from "bun:test";
-import { member, reportArtifacts, reportShares } from "@bugcapture/db/schema";
+import {
+  member,
+  reportArtifacts,
+  reportShares,
+  reports,
+} from "@bugcapture/db/schema";
+import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { signUpAndOrg, type TestCtx, withTestDb } from "./helpers";
 
@@ -22,7 +28,9 @@ const shareSchema = z.looseObject({
 
 const detailSchema = z.object({
   id: z.string(),
-  artifacts: z.array(z.object({ id: z.string(), type: z.string() })),
+  artifacts: z.array(
+    z.object({ id: z.string(), type: z.string(), downloadUrl: z.string() }),
+  ),
   shares: z.array(shareSchema),
 });
 
@@ -433,6 +441,131 @@ describe("reports", () => {
       });
       expect(res.status).toBe(400);
       expect((await res.json()).error).toBe("assignee not in organization");
+    } finally {
+      await ctx.stop();
+    }
+  }, 120_000);
+
+  it("list rows omit the data blob and order newest-first", async () => {
+    const ctx = await withTestDb();
+    try {
+      const { cookie } = await signUpAndOrg(ctx.app);
+      const p = await createProject(ctx.app, cookie);
+      const older = reportSchema.parse(
+        await (
+          await createReport(ctx.app, cookie, {
+            projectId: p.id,
+            title: "one",
+          })
+        ).json(),
+      );
+      const newer = reportSchema.parse(
+        await (
+          await createReport(ctx.app, cookie, {
+            projectId: p.id,
+            title: "two",
+          })
+        ).json(),
+      );
+      // pin createdAt so ordering is deterministic
+      await ctx.db
+        .update(reports)
+        .set({ createdAt: new Date("2026-01-01") })
+        .where(eq(reports.id, older.id));
+      await ctx.db
+        .update(reports)
+        .set({ createdAt: new Date("2026-02-01") })
+        .where(eq(reports.id, newer.id));
+
+      const res = await ctx.app.request("/api/v1/reports", {
+        headers: { cookie },
+      });
+      const rows = (await res.json()) as Record<string, unknown>[];
+      expect(rows.length).toBe(2);
+      for (const row of rows) {
+        expect(row).not.toHaveProperty("data");
+        expect(row.id).toBeString();
+        expect(row.title).toBeString();
+        expect(row.status).toBeString();
+      }
+      expect(rows[0].id).toBe(newer.id);
+    } finally {
+      await ctx.stop();
+    }
+  }, 120_000);
+
+  it("detail returns artifacts with downloadUrl", async () => {
+    const ctx = await withTestDb();
+    try {
+      const { cookie } = await signUpAndOrg(ctx.app);
+      const p = await createProject(ctx.app, cookie);
+      const rep = reportSchema.parse(
+        await (
+          await createReport(ctx.app, cookie, {
+            projectId: p.id,
+            title: "t",
+          })
+        ).json(),
+      );
+      await ctx.db.insert(reportArtifacts).values({
+        id: crypto.randomUUID(),
+        reportId: rep.id,
+        type: "screenshot",
+        storageProvider: "local",
+        storageKey: "abc123-shot",
+        contentType: "image/png",
+        sizeBytes: 10,
+        sha256: "abc",
+      });
+      const res = await ctx.app.request(`/api/v1/reports/${rep.id}`, {
+        headers: { cookie },
+      });
+      const d = detailSchema.parse(await res.json());
+      expect(d.artifacts[0].downloadUrl).toBe(
+        `http://localhost:3000/api/v1/uploads/${rep.id}/abc123-shot`,
+      );
+    } finally {
+      await ctx.stop();
+    }
+  }, 120_000);
+
+  it("DELETE sweeps artifact objects from storage", async () => {
+    const ctx = await withTestDb();
+    try {
+      const { cookie } = await signUpAndOrg(ctx.app);
+      const p = await createProject(ctx.app, cookie);
+      const rep = reportSchema.parse(
+        await (
+          await createReport(ctx.app, cookie, {
+            projectId: p.id,
+            title: "t",
+          })
+        ).json(),
+      );
+      const key = "abc123-shot";
+      await ctx.db.insert(reportArtifacts).values({
+        id: crypto.randomUUID(),
+        reportId: rep.id,
+        type: "screenshot",
+        storageProvider: "local",
+        storageKey: key,
+        contentType: "image/png",
+        sizeBytes: 4,
+        sha256: "abc",
+      });
+      await ctx.storage.write(
+        rep.id,
+        key,
+        new TextEncoder().encode("abcd").buffer as ArrayBuffer,
+      );
+      expect(await ctx.storage.head(rep.id, key)).not.toBeNull();
+
+      const del = await ctx.app.request(`/api/v1/reports/${rep.id}`, {
+        method: "DELETE",
+        headers: { cookie },
+      });
+      expect(del.status).toBe(204);
+      expect(await ctx.storage.head(rep.id, key)).toBeNull();
     } finally {
       await ctx.stop();
     }

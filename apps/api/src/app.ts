@@ -9,6 +9,8 @@ import { reportsRoutes } from "./routes/reports";
 import { sharesRoutes } from "./routes/shares";
 import { tokensRoutes } from "./routes/tokens";
 
+export type App = ReturnType<typeof buildApp>;
+
 export function buildApp(
   db: Db,
   auth: Auth,
@@ -19,7 +21,7 @@ export function buildApp(
   app.on(["GET", "POST"], "/api/auth/*", (c) => auth.handler(c.req.raw));
   app.get("/healthz", (c) => c.json({ ok: true }));
   app.route("/api/v1/projects", projectsRoutes(db, auth));
-  app.route("/api/v1/reports", reportsRoutes(db, auth));
+  app.route("/api/v1/reports", reportsRoutes(db, auth, storage));
   const shares = sharesRoutes(db, auth, baseUrl);
   app.route("/api/v1", shares.authed);
   app.route("/", shares.pub);

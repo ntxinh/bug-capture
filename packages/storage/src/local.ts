@@ -1,4 +1,4 @@
-import { mkdir, stat, unlink, writeFile } from "node:fs/promises";
+import { mkdir, readFile, stat, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { ArtifactKind, ArtifactStorage, UploadTarget } from "./index";
 
@@ -40,6 +40,13 @@ export class LocalFsStorage implements ArtifactStorage {
     const p = this.path(reportId, key);
     await mkdir(join(this.root, reportId), { recursive: true });
     await writeFile(p, Buffer.from(body));
+  }
+  async read(reportId: string, key: string): Promise<ArrayBuffer> {
+    const buf = await readFile(this.path(reportId, key));
+    return buf.buffer.slice(
+      buf.byteOffset,
+      buf.byteOffset + buf.byteLength,
+    ) as ArrayBuffer;
   }
 
   async delete(reportId: string, key: string) {
