@@ -69,4 +69,48 @@ describe("projects", () => {
       await ctx.stop();
     }
   }, 120_000);
+
+  it("409s on duplicate slug, env key, and origin", async () => {
+    const ctx = await withTestDb();
+    try {
+      const { cookie } = await signUpAndOrg(ctx.app);
+      const post = (path: string, body: Record<string, unknown>) =>
+        ctx.app.request(path, {
+          method: "POST",
+          headers: { "content-type": "application/json", cookie },
+          body: JSON.stringify(body),
+        });
+
+      const first = await post("/api/v1/projects", {
+        name: "Portal",
+        slug: "portal",
+      });
+      expect(first.status).toBe(201);
+      const { id } = z.object({ id: z.string() }).parse(await first.json());
+      const dup = await post("/api/v1/projects", {
+        name: "Portal 2",
+        slug: "portal",
+      });
+      expect(dup.status).toBe(409);
+      expect((await dup.json()).error).toBe("slug already used");
+
+      const envBody = { name: "prod", key: "prod" };
+      expect(
+        (await post(`/api/v1/projects/${id}/environments`, envBody)).status,
+      ).toBe(201);
+      expect(
+        (await post(`/api/v1/projects/${id}/environments`, envBody)).status,
+      ).toBe(409);
+
+      const originBody = { origin: "https://app.example.com" };
+      expect(
+        (await post(`/api/v1/projects/${id}/origins`, originBody)).status,
+      ).toBe(201);
+      expect(
+        (await post(`/api/v1/projects/${id}/origins`, originBody)).status,
+      ).toBe(409);
+    } finally {
+      await ctx.stop();
+    }
+  }, 120_000);
 });

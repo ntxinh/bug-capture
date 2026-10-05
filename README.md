@@ -30,7 +30,7 @@ The extension works fully offline; the server is an optional destination.
 
     mise install        # bun + node
     make install        # bun install (workspaces)
-    make test           # extension build + unit tests + package tests
+    make test           # extension build + unit tests (no containers)
     make test-e2e       # playwright extension e2e (needs browsers)
     make lint           # biome check
 
@@ -40,7 +40,7 @@ The extension works fully offline; the server is an optional destination.
     make db-up          # postgres:16 via podman/docker compose
     make db-migrate     # apply drizzle migrations
     make dev-api        # hono api on :3000  (/api/auth/*, /api/v1/*)
-    make test-api       # api tests — needs podman socket + testcontainers env from .env.example
+    make test-api       # api + db tests — needs podman socket + testcontainers env from .env.example
 
 ## Docs
 

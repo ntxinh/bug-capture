@@ -171,4 +171,24 @@ describe("capture-sessions", () => {
       await ctx.stop();
     }
   }, 120_000);
+
+  it("second patch on a transitioned session is rejected (409/400)", async () => {
+    const ctx = await withTestDb();
+    try {
+      const { cookie } = await signUpAndOrg(ctx.app);
+      const project = await createProject(ctx, cookie);
+      const s = sessionSchema.parse(
+        await (
+          await createSession(ctx, cookie, { projectId: project.id })
+        ).json(),
+      );
+      // submit the session, then retry a transition from the stale "stopped" view
+      expect((await patch(ctx, cookie, s.id, "stopped")).status).toBe(200);
+      expect((await patch(ctx, cookie, s.id, "submitted")).status).toBe(200);
+      const stale = await patch(ctx, cookie, s.id, "stopped");
+      expect([400, 409]).toContain(stale.status);
+    } finally {
+      await ctx.stop();
+    }
+  }, 120_000);
 });

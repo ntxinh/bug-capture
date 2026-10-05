@@ -10,10 +10,10 @@ test: build test-unit
 
 test-unit:
 	cd apps/extension && bun test test/
-	bun test packages/
+	bun test packages/report-schema packages/report-core packages/redaction
 
 test-api:
-	bun test apps/api/test/
+	bun test packages/db/test/ apps/api/test/
 
 test-e2e:
 	cd apps/extension && bunx playwright test

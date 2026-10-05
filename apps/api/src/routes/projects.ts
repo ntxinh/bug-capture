@@ -4,13 +4,23 @@ import {
   projectOrigins,
   projects,
 } from "@bugcapture/db/schema";
-import { zValidator } from "@hono/zod-validator";
 import { eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 import type { Auth } from "../lib/auth";
 import { isAdmin, projectInOrg } from "../lib/policy";
 import { requireAuth } from "../lib/session";
+import { zjson } from "../lib/validate";
+
+// postgres.js surfaces `code` directly; drizzle wraps it in DrizzleQueryError.cause
+const isUniqueViolation = (e: unknown): boolean => {
+  let cur: unknown = e;
+  while (cur && typeof cur === "object") {
+    if ("code" in cur && cur.code === "23505") return true;
+    cur = "cause" in cur ? cur.cause : undefined;
+  }
+  return false;
+};
 
 const createProject = z.object({
   name: z.string().min(1).max(120),
@@ -44,7 +54,7 @@ export function projectsRoutes(db: Db, auth: Auth) {
   const r = new Hono();
   r.use("*", requireAuth(auth));
 
-  r.post("/", zValidator("json", createProject), async (c) => {
+  r.post("/", zjson("json", createProject), async (c) => {
     const { name, slug } = c.req.valid("json");
     const orgId = c.var.orgId;
     const id = crypto.randomUUID();
@@ -58,7 +68,12 @@ export function projectsRoutes(db: Db, auth: Auth) {
         key: `oj_${crypto.randomUUID().replaceAll("-", "")}`,
         publicKey: `oj_pk_${Buffer.from(crypto.getRandomValues(new Uint8Array(24))).toString("base64url")}`,
       })
-      .returning();
+      .returning()
+      .catch((e) => {
+        if (isUniqueViolation(e)) return [null];
+        throw e;
+      });
+    if (!row) return c.json({ error: "slug already used" }, 409);
     return c.json(row, 201);
   });
 
@@ -76,7 +91,7 @@ export function projectsRoutes(db: Db, auth: Auth) {
     return c.json(p);
   });
 
-  r.patch("/:id", zValidator("json", patchProject), async (c) => {
+  r.patch("/:id", zjson("json", patchProject), async (c) => {
     if (!(await isAdmin(db, c.var.user.id, c.var.orgId)))
       return c.json({ error: "forbidden" }, 403);
     const p = await projectInOrg(db, c.var.orgId, c.req.param("id"));
@@ -85,7 +100,12 @@ export function projectsRoutes(db: Db, auth: Auth) {
       .update(projects)
       .set(c.req.valid("json"))
       .where(eq(projects.id, p.id))
-      .returning();
+      .returning()
+      .catch((e) => {
+        if (isUniqueViolation(e)) return [null];
+        throw e;
+      });
+    if (!row) return c.json({ error: "slug already used" }, 409);
     return c.json(row);
   });
 
@@ -98,14 +118,19 @@ export function projectsRoutes(db: Db, auth: Auth) {
     return c.body(null, 204);
   });
 
-  r.post("/:id/environments", zValidator("json", createEnv), async (c) => {
+  r.post("/:id/environments", zjson("json", createEnv), async (c) => {
     const p = await projectInOrg(db, c.var.orgId, c.req.param("id"));
     if (!p) return c.json({ error: "not found" }, 404);
     const body = c.req.valid("json");
     const [row] = await db
       .insert(projectEnvironments)
       .values({ id: crypto.randomUUID(), projectId: p.id, ...body })
-      .returning();
+      .returning()
+      .catch((e) => {
+        if (isUniqueViolation(e)) return [null];
+        throw e;
+      });
+    if (!row) return c.json({ error: "key already used" }, 409);
     return c.json(row, 201);
   });
 
@@ -119,7 +144,7 @@ export function projectsRoutes(db: Db, auth: Auth) {
     return c.json(rows);
   });
 
-  r.post("/:id/origins", zValidator("json", createOrigin), async (c) => {
+  r.post("/:id/origins", zjson("json", createOrigin), async (c) => {
     if (!(await isAdmin(db, c.var.user.id, c.var.orgId)))
       return c.json({ error: "forbidden" }, 403);
     const p = await projectInOrg(db, c.var.orgId, c.req.param("id"));
@@ -131,7 +156,12 @@ export function projectsRoutes(db: Db, auth: Auth) {
         projectId: p.id,
         origin: c.req.valid("json").origin,
       })
-      .returning();
+      .returning()
+      .catch((e) => {
+        if (isUniqueViolation(e)) return [null];
+        throw e;
+      });
+    if (!row) return c.json({ error: "origin already used" }, 409);
     return c.json(row, 201);
   });
 

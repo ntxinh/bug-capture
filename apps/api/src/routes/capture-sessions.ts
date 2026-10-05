@@ -1,12 +1,12 @@
 import type { Db } from "@bugcapture/db";
 import { captureSessions, projectEnvironments } from "@bugcapture/db/schema";
-import { zValidator } from "@hono/zod-validator";
 import { and, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 import type { Auth } from "../lib/auth";
 import { projectInOrg } from "../lib/policy";
 import { requireAuth } from "../lib/session";
+import { zjson } from "../lib/validate";
 
 const TRANSITIONS: Record<string, string[]> = {
   recording: ["stopped", "discarded"],
@@ -27,7 +27,7 @@ export function captureSessionsRoutes(db: Db, auth: Auth) {
   const r = new Hono();
   r.use("*", requireAuth(auth));
 
-  r.post("/", zValidator("json", createSession), async (c) => {
+  r.post("/", zjson("json", createSession), async (c) => {
     const { projectId, environmentId } = c.req.valid("json");
     const p = await projectInOrg(db, c.var.orgId, projectId);
     if (!p) return c.json({ error: "not found" }, 404);
@@ -66,7 +66,7 @@ export function captureSessionsRoutes(db: Db, auth: Auth) {
     return c.json(rows);
   });
 
-  r.patch("/:id", zValidator("json", patchSession), async (c) => {
+  r.patch("/:id", zjson("json", patchSession), async (c) => {
     const [s] = await db
       .select()
       .from(captureSessions)
@@ -83,8 +83,11 @@ export function captureSessionsRoutes(db: Db, auth: Auth) {
     const [row] = await db
       .update(captureSessions)
       .set({ status: next, endedAt: s.endedAt ?? new Date() })
-      .where(eq(captureSessions.id, s.id))
+      .where(
+        and(eq(captureSessions.id, s.id), eq(captureSessions.status, s.status)),
+      )
       .returning();
+    if (!row) return c.json({ error: "status changed; reload and retry" }, 409);
     return c.json(row);
   });
 

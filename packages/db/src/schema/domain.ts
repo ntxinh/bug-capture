@@ -109,6 +109,10 @@ export const reports = pgTable(
     assignedTo: text("assigned_to").references(() => user.id, {
       onDelete: "set null",
     }),
+    captureSessionId: text("capture_session_id").references(
+      () => captureSessions.id,
+      { onDelete: "set null" },
+    ),
     captureMode: text("capture_mode"),
     startedAt: timestamp("started_at"),
     endedAt: timestamp("ended_at"),
@@ -139,6 +143,8 @@ export const reportArtifacts = pgTable(
     sizeBytes: integer("size_bytes").notNull(),
     sha256: text("sha256").notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
+    status: text("status").default("pending").notNull(),
+    // status: pending | uploaded | verified
   },
   (t) => [index("report_artifacts_reportId_idx").on(t.reportId)],
 );

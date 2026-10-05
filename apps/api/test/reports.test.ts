@@ -406,4 +406,35 @@ describe("reports", () => {
       await ctx.stop();
     }
   }, 120_000);
+
+  it("rejects assignedTo for a user outside the org (400)", async () => {
+    const ctx = await withTestDb();
+    try {
+      const a = await signUpAndOrg(ctx.app, "a@t.dev");
+      const b = await signUpAndOrg(ctx.app, "b@t.dev");
+      // b's user id — member of a different org only
+      const bMember = await ctx.db.query.member.findFirst({
+        where: (m, { eq }) => eq(m.organizationId, b.orgId),
+      });
+      const foreignUserId = bMember?.userId ?? "nonexistent-user";
+      const p = await createProject(ctx.app, a.cookie);
+      const rep = reportSchema.parse(
+        await (
+          await createReport(ctx.app, a.cookie, {
+            projectId: p.id,
+            title: "t",
+          })
+        ).json(),
+      );
+      const res = await ctx.app.request(`/api/v1/reports/${rep.id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json", cookie: a.cookie },
+        body: JSON.stringify({ assignedTo: foreignUserId }),
+      });
+      expect(res.status).toBe(400);
+      expect((await res.json()).error).toBe("assignee not in organization");
+    } finally {
+      await ctx.stop();
+    }
+  }, 120_000);
 });

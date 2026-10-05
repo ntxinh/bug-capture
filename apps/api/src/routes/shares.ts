@@ -1,13 +1,13 @@
 import { createHash, getRandomValues } from "node:crypto";
 import type { Db } from "@bugcapture/db";
 import { reportShares, reports } from "@bugcapture/db/schema";
-import { zValidator } from "@hono/zod-validator";
 import { and, eq, gt, isNull, or } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 import type { Auth } from "../lib/auth";
 import { reportInOrg } from "../lib/policy";
 import { requireAuth } from "../lib/session";
+import { zjson } from "../lib/validate";
 
 function mintToken() {
   return `oj_${Buffer.from(getRandomValues(new Uint8Array(24))).toString("base64url")}`;
@@ -22,10 +22,7 @@ export function sharesRoutes(db: Db, auth: Auth, baseUrl: string) {
 
   authed.post(
     "/reports/:reportId/shares",
-    zValidator(
-      "json",
-      z.object({ expiresAt: z.string().datetime().optional() }),
-    ),
+    zjson("json", z.object({ expiresAt: z.string().datetime().optional() })),
     async (c) => {
       const r = await reportInOrg(db, c.var.orgId, c.req.param("reportId"));
       if (!r) return c.json({ error: "not found" }, 404);

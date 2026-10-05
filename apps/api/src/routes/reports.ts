@@ -1,17 +1,18 @@
 import type { Db } from "@bugcapture/db";
 import {
+  member,
   projectEnvironments,
   reportArtifacts,
   reportShares,
   reports,
 } from "@bugcapture/db/schema";
-import { zValidator } from "@hono/zod-validator";
 import { and, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 import type { Auth } from "../lib/auth";
 import { isAdmin, isMember, projectInOrg, reportInOrg } from "../lib/policy";
 import { requireAuth } from "../lib/session";
+import { zjson } from "../lib/validate";
 
 const createReport = z.object({
   projectId: z.string().min(1),
@@ -34,7 +35,7 @@ export function reportsRoutes(db: Db, auth: Auth) {
   const r = new Hono();
   r.use("*", requireAuth(auth));
 
-  r.post("/", zValidator("json", createReport), async (c) => {
+  r.post("/", zjson("json", createReport), async (c) => {
     const { projectId, environmentId, ...rest } = c.req.valid("json");
     const orgId = c.var.orgId;
     const p = await projectInOrg(db, orgId, projectId);
@@ -98,14 +99,27 @@ export function reportsRoutes(db: Db, auth: Auth) {
     return c.json({ ...rep, artifacts, shares });
   });
 
-  r.patch("/:id", zValidator("json", patchReport), async (c) => {
+  r.patch("/:id", zjson("json", patchReport), async (c) => {
     if (!(await isMember(db, c.var.user.id, c.var.orgId)))
       return c.json({ error: "forbidden" }, 403);
     const rep = await reportInOrg(db, c.var.orgId, c.req.param("id"));
     if (!rep) return c.json({ error: "not found" }, 404);
+    const body = c.req.valid("json");
+    if (body.assignedTo) {
+      const [m] = await db
+        .select({ id: member.id })
+        .from(member)
+        .where(
+          and(
+            eq(member.userId, body.assignedTo),
+            eq(member.organizationId, c.var.orgId),
+          ),
+        );
+      if (!m) return c.json({ error: "assignee not in organization" }, 400);
+    }
     const [row] = await db
       .update(reports)
-      .set({ ...c.req.valid("json"), updatedAt: new Date() })
+      .set({ ...body, updatedAt: new Date() })
       .where(eq(reports.id, rep.id))
       .returning();
     return c.json(row);
