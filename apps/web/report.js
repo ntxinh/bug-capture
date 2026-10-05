@@ -57,7 +57,7 @@ if (!id) {
       meta: {
         ...(env.meta ?? {}),
         pageTitle: rep.title,
-        capturedAt: env.meta?.capturedAt ?? rep.createdAt,
+        capturedAt: env.meta?.capturedAt ?? Date.parse(rep.createdAt),
       },
       device: env.meta?.device,
       events: env.events ?? [],
@@ -68,6 +68,7 @@ if (!id) {
     const replay = rep.artifacts?.find(
       (a) => a.type === "replay" && uploaded(a),
     );
+    const audio = rep.artifacts?.find((a) => a.type === "audio" && uploaded(a));
     try {
       if (replay)
         report.rrwebEvents = await fetch(replay.downloadUrl).then((r) =>

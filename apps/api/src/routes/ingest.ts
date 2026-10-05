@@ -214,6 +214,7 @@ export function ingestRoutes(db: Db, auth: Auth, storage: ArtifactStorage) {
       return new Response(body, {
         headers: {
           "content-type": artifact.contentType ?? "application/octet-stream",
+          "content-disposition": "inline",
         },
       });
     }
