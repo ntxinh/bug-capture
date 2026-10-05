@@ -172,6 +172,28 @@ describe("outbox", () => {
     expect(await drainOutbox(ctx.db, { fetchImpl: okFetch })).toBe(0);
   });
 
+  it("claimed 'delivering' rows are skipped by a second drain", async () => {
+    const p = await createProject("o-claim");
+    const { reportId } = await ingest(p.id);
+    await addIntegration(p.id, "webhook", "https://hooks.example.test/claim");
+
+    let innerSent = -1;
+    let midStatus = "";
+    const sent = await drainOutbox(ctx.db, {
+      fetchImpl: async () => {
+        const [row] = await outboxRows(reportId);
+        midStatus = row.status;
+        innerSent = await drainOutbox(ctx.db, { fetchImpl: okFetch });
+        return new Response("ok");
+      },
+    });
+    expect(sent).toBe(1);
+    expect(midStatus).toBe("delivering");
+    expect(innerSent).toBe(0); // overlapping drain claimed nothing
+    const [after] = await outboxRows(reportId);
+    expect(after.status).toBe("sent");
+  });
+
   it("PATCH status→resolved emits report.resolved", async () => {
     const p = await createProject("o-res");
     const created = await ctx.app.request("/api/v1/reports", {
@@ -196,5 +218,35 @@ describe("outbox", () => {
     expect(payload.url).toBe(
       `http://localhost:3000/app/report.html?id=${rep.id}`,
     );
+  });
+
+  it("repeat PATCH resolved does not re-emit; re-open→re-resolve does", async () => {
+    const p = await createProject("o-res2");
+    const created = await ctx.app.request("/api/v1/reports", {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify({ projectId: p.id, title: "Dedup me" }),
+    });
+    const rep = z.object({ id: z.string() }).parse(await created.json());
+    const patch = (status: string) =>
+      ctx.app.request(`/api/v1/reports/${rep.id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json", cookie },
+        body: JSON.stringify({ status }),
+      });
+
+    await patch("resolved");
+    await patch("resolved"); // already resolved → no second event
+    const resolved = (await outboxRows(rep.id)).filter(
+      (e) => e.type === "report.resolved",
+    );
+    expect(resolved.length).toBe(1);
+
+    await patch("open");
+    await patch("resolved"); // transition again → emits
+    const resolved2 = (await outboxRows(rep.id)).filter(
+      (e) => e.type === "report.resolved",
+    );
+    expect(resolved2.length).toBe(2);
   });
 });

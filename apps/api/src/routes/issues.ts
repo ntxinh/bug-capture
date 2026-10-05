@@ -47,18 +47,20 @@ export function issuesRoutes(db: Db, auth: Auth, baseUrl: string) {
     } catch {
       return c.json({ error: "github upstream" }, 502);
     }
-    await db.insert(externalLinks).values({
-      id: crypto.randomUUID(),
-      reportId: rep.id,
-      provider: "github",
-      externalId: link.externalId,
-      url: link.url,
-    });
-    await emitReportEvent(db, "issue.linked", rep.id, {
-      title: rep.title,
-      status: rep.status,
-      url: reportUrl,
-      externalUrl: link.url,
+    await db.transaction(async (tx) => {
+      await tx.insert(externalLinks).values({
+        id: crypto.randomUUID(),
+        reportId: rep.id,
+        provider: "github",
+        externalId: link.externalId,
+        url: link.url,
+      });
+      await emitReportEvent(tx, "issue.linked", rep.id, {
+        title: rep.title,
+        status: rep.status,
+        url: reportUrl,
+        externalUrl: link.url,
+      });
     });
     return c.json(link, 201);
   });

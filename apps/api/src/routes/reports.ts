@@ -159,7 +159,7 @@ export function reportsRoutes(
       .set({ ...body, updatedAt: new Date() })
       .where(eq(reports.id, rep.id))
       .returning();
-    if (body.status === "resolved")
+    if (body.status === "resolved" && rep.status !== "resolved")
       await emitReportEvent(db, "report.resolved", rep.id, {
         title: rep.title,
         status: "resolved",

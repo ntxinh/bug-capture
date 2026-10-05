@@ -4,7 +4,7 @@ import {
   reportOutboxEvents,
   reports,
 } from "@bugcapture/db/schema";
-import { and, asc, eq, lte } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { unsealConfig } from "./integration-config";
 // Pick<Db,"insert"> so callers inside db.transaction(tx => …) can pass tx.
 export async function emitReportEvent(
@@ -31,25 +31,30 @@ export interface DrainOptions {
 
 /**
  * Delivers pending outbox events to the report project's enabled slack/webhook
- * integrations. SKIP LOCKED keeps it safe for future multi-worker. Non-2xx
- * counts as a failed delivery.
+ * integrations. One UPDATE ... FOR UPDATE SKIP LOCKED statement atomically
+ * claims due rows as 'delivering' — an overlapping drain sees them as
+ * non-pending and skips, so no double delivery. Claims stamp nextAttemptAt =
+ * now(), so a 'delivering' row orphaned by a crash is reclaimed after 10min.
+ * Non-2xx counts as a failed delivery.
  */
 export async function drainOutbox(
   db: Db,
   { limit = 25, fetchImpl = fetch }: DrainOptions = {},
 ): Promise<number> {
   const due = await db
-    .select()
-    .from(reportOutboxEvents)
+    .update(reportOutboxEvents)
+    .set({ status: "delivering", nextAttemptAt: new Date() })
     .where(
-      and(
-        eq(reportOutboxEvents.status, "pending"),
-        lte(reportOutboxEvents.nextAttemptAt, new Date()),
-      ),
+      sql`${reportOutboxEvents.id} in (
+        select id from report_outbox_events
+        where (status = 'pending' and next_attempt_at <= now())
+           or (status = 'delivering' and next_attempt_at < now() - interval '10 minutes')
+        order by created_at
+        limit ${limit}
+        for update skip locked
+      )`,
     )
-    .orderBy(asc(reportOutboxEvents.createdAt))
-    .limit(limit)
-    .for("update", { skipLocked: true });
+    .returning();
   let sent = 0;
   for (const evt of due) {
     const [rep] = await db
@@ -89,6 +94,7 @@ export async function drainOutbox(
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify(body),
+          signal: AbortSignal.timeout(10_000),
         });
         if (!res.ok) throw new Error(`integration post ${res.status}`);
       }
@@ -117,9 +123,15 @@ export function startOutboxWorker(
   db: Db,
   { intervalMs = 15_000 }: { intervalMs?: number } = {},
 ): () => void {
-  const timer = setInterval(
-    () => drainOutbox(db).catch((e) => console.error("outbox drain", e)),
-    intervalMs,
-  );
+  let running = false;
+  const timer = setInterval(() => {
+    if (running) return; // slow batch still in flight — skip this tick
+    running = true;
+    drainOutbox(db)
+      .catch((e) => console.error("outbox drain", e))
+      .finally(() => {
+        running = false;
+      });
+  }, intervalMs);
   return () => clearInterval(timer);
 }
