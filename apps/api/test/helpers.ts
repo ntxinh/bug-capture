@@ -1,4 +1,8 @@
+import { mkdtemp } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { createDb, type Db, migrate } from "@bugcapture/db";
+import { LocalFsStorage } from "@bugcapture/storage";
 import { PostgreSqlContainer } from "@testcontainers/postgresql";
 import { buildApp } from "../src/app";
 import { createAuth } from "../src/lib/auth";
@@ -18,7 +22,11 @@ export async function withTestDb(): Promise<TestCtx> {
   await migrate(url);
   const db = createDb(url);
   const auth = createAuth(db, "test-secret", "http://localhost:3000");
-  const app = buildApp(db, auth, "http://localhost:3000");
+  const storage = new LocalFsStorage(
+    await mkdtemp(join(tmpdir(), "oj-art-")),
+    "http://localhost:3000",
+  );
+  const app = buildApp(db, auth, "http://localhost:3000", storage);
   return { app, db, stop: () => container.stop() };
 }
 

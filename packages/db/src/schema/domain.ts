@@ -1,6 +1,7 @@
 import {
   index,
   integer,
+  jsonb,
   pgTable,
   text,
   timestamp,
@@ -113,6 +114,8 @@ export const reports = pgTable(
       () => captureSessions.id,
       { onDelete: "set null" },
     ),
+    source: text("source"),
+    data: jsonb("data"),
     captureMode: text("capture_mode"),
     startedAt: timestamp("started_at"),
     endedAt: timestamp("ended_at"),
