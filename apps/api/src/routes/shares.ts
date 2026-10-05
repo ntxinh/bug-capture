@@ -18,7 +18,9 @@ function hashToken(t: string) {
 
 export function sharesRoutes(db: Db, auth: Auth, baseUrl: string) {
   const authed = new Hono();
-  authed.use("*", requireAuth(auth, db));
+  // not "*": mounted at /api/v1, a catch-all would also gate /api/v1/capture/*
+  authed.use("/reports/*", requireAuth(auth, db));
+  authed.use("/shares/*", requireAuth(auth, db));
 
   authed.post(
     "/reports/:reportId/shares",

@@ -15,7 +15,9 @@ import { zjson } from "../lib/validate";
 
 export function ingestRoutes(db: Db, auth: Auth, storage: ArtifactStorage) {
   const r = new Hono();
-  r.use("*", requireAuth(auth, db));
+  // not "*": mounted at /api/v1, a catch-all would also gate /api/v1/capture/*
+  r.use("/reports/*", requireAuth(auth, db));
+  r.use("/uploads/*", requireAuth(auth, db));
 
   r.post("/reports/ingest", zjson("json", envelopeSchema), async (c) => {
     const { projectId, ...body } = c.req.valid("json");
