@@ -1,4 +1,5 @@
 import {
+  boolean,
   index,
   integer,
   jsonb,
@@ -205,5 +206,49 @@ export const personalAccessTokens = pgTable(
   (t) => [
     index("personal_access_tokens_org_idx").on(t.organizationId),
     index("personal_access_tokens_user_idx").on(t.userId),
+  ],
+);
+
+export const projectIntegrations = pgTable(
+  "project_integrations",
+  {
+    id: text("id").primaryKey(),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    provider: text("provider").notNull(),
+    config: jsonb("config").notNull(),
+    enabled: boolean("enabled").notNull().default(true),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("project_integrations_project_provider_uidx").on(
+      t.projectId,
+      t.provider,
+    ),
+  ],
+);
+
+export const reportOutboxEvents = pgTable(
+  "report_outbox_events",
+  {
+    id: text("id").primaryKey(),
+    type: text("type").notNull(),
+    reportId: text("report_id")
+      .notNull()
+      .references(() => reports.id, { onDelete: "cascade" }),
+    payload: jsonb("payload").notNull(),
+    status: text("status").notNull().default("pending"),
+    attempts: integer("attempts").notNull().default(0),
+    lastError: text("last_error"),
+    nextAttemptAt: timestamp("next_attempt_at").notNull().defaultNow(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    sentAt: timestamp("sent_at"),
+  },
+  (t) => [
+    index("report_outbox_events_status_next_attempt_idx").on(
+      t.status,
+      t.nextAttemptAt,
+    ),
   ],
 );

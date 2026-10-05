@@ -36,6 +36,13 @@
       "when": 1791189787348,
       "tag": "0004_eminent_warpath",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1791199297560,
+      "tag": "0005_rare_guardian",
+      "breakpoints": true
     }
   ]
 }

@@ -35,6 +35,9 @@ describe("migrate", () => {
         "report_artifacts",
         "report_shares",
         "external_links",
+        "personal_access_tokens",
+        "project_integrations",
+        "report_outbox_events",
       ]) {
         expect(names).toContain(t);
       }
