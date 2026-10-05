@@ -239,7 +239,7 @@ describe("releases", () => {
       const p = await createProject(ctx, cookie, "fn");
       const rel = await createRelease(ctx, cookie, p.id);
 
-      for (const name of ["..%2Fetc", "a%2Fb.js.map", "weird%name"]) {
+      for (const name of ["..%2Fetc", "a%2Fb.js.map", "weird%name", "%2E"]) {
         const put = await ctx.app.request(
           `/api/v1/releases/${rel.json.id}/sourcemaps/${name}`,
           { method: "PUT", headers: { cookie }, body: MAP_BYTES },

@@ -93,6 +93,7 @@ async function createProject(ctx: TestCtx, cookie: string) {
 const STACK = [
   "at doThing (https://x.test/app.js:1:234)",
   "at vend (https://x.test/vendor.js:2:10)",
+  "at boom (https://x.test/app.js:0:5)", // line 0: must passthrough, not 500
   "at native frame",
 ];
 const baseEvents = () => [
@@ -109,8 +110,28 @@ const baseEvents = () => [
     rel: 100,
     kind: "network",
     title: "GET /api/x",
-    detail: { method: "GET", url: "/api/x", status: 200, durationMs: 1200 },
+    detail: {
+      method: "GET",
+      url: "/api/x",
+      status: 200,
+      durationMs: 1200,
+      failed: false, // extension emits this on every successful request
+    },
   },
+  {
+    t: 1150,
+    rel: 150,
+    kind: "network",
+    title: "GET /api/flaky",
+    detail: {
+      method: "GET",
+      url: "/api/flaky",
+      status: 0,
+      durationMs: 30,
+      failed: true,
+    },
+  },
+
   {
     t: 1200,
     rel: 200,
@@ -151,7 +172,7 @@ async function ingestReport(
       meta: {
         url: "https://x.test",
         userAgent: "UA-9",
-        viewport: "100x200",
+        device: { viewport: { width: 100, height: 200 } },
         capturedAt: 999,
         durationMs: 1234,
       },
@@ -216,7 +237,9 @@ describe("GET /reports/:id/ai-context", () => {
       });
       // no map → raw frames pass through
       expect(c.failures[0].stack).toEqual(STACK);
+      // failed:false (/api/x) excluded; failed:true + 5xx both count
       expect(c.network.failures).toEqual([
+        { method: "GET", url: "/api/flaky", status: 0, durationMs: 30 },
         { method: "POST", url: "/api/y", status: 500, durationMs: 40 },
       ]);
       expect(c.network.slowest[0]).toEqual({ url: "/api/x", durationMs: 1200 });
@@ -226,8 +249,8 @@ describe("GET /reports/:id/ai-context", () => {
         viewport: "100x200",
         url: "https://x.test",
       });
-      expect(c.reproduction).toHaveLength(4);
-      expect(c.reproduction.map((e) => e.rel)).toEqual([0, 100, 200, 300]);
+      expect(c.reproduction).toHaveLength(5);
+      expect(c.reproduction.map((e) => e.rel)).toEqual([0, 100, 150, 200, 300]);
       expect(c.artifacts.replay).toContain(`/api/v1/uploads/${reportId}/`);
       expect(c.artifacts.screenshots).toBe(1);
       expect(c.artifacts.audio).toBeNull();
@@ -260,10 +283,12 @@ describe("GET /reports/:id/ai-context", () => {
 
       const { ctx: c } = await getAiCtx(ctx, cookie, reportId);
       expect(c.sourceMapsResolved).toBe(true);
-      // app.js frame resolves to the original source; vendor.js has no map → passthrough
+      // app.js resolves to the original source; vendor.js has no map and
+      // the :0: line frame is unresolvable — both pass through
       expect(c.failures[0].stack).toEqual([
         "src/app.ts:1:0",
         "at vend (https://x.test/vendor.js:2:10)",
+        "at boom (https://x.test/app.js:0:5)",
         "at native frame",
       ]);
     } finally {

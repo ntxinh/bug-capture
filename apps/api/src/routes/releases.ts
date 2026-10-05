@@ -77,7 +77,11 @@ export function releasesRoutes(db: Db, auth: Auth, storage: ArtifactStorage) {
     if (!(await isMember(db, c.var.user.id, c.var.orgId)))
       return c.json({ error: "forbidden" }, 403);
     const { id, filename } = c.req.param();
-    if (!SAFE_FILENAME.test(filename) || filename.includes(".."))
+    if (
+      !SAFE_FILENAME.test(filename) ||
+      filename.includes("..") ||
+      filename === "."
+    )
       return c.json({ error: "not found" }, 404);
     const release = await releaseInOrg(c.var.orgId, id);
     if (!release) return c.json({ error: "not found" }, 404);
@@ -114,7 +118,11 @@ export function releasesRoutes(db: Db, auth: Auth, storage: ArtifactStorage) {
 
   r.get("/releases/:id/sourcemaps/:filename", async (c) => {
     const { id, filename } = c.req.param();
-    if (!SAFE_FILENAME.test(filename) || filename.includes(".."))
+    if (
+      !SAFE_FILENAME.test(filename) ||
+      filename.includes("..") ||
+      filename === "."
+    )
       return c.json({ error: "not found" }, 404);
     const release = await releaseInOrg(c.var.orgId, id);
     if (!release) return c.json({ error: "not found" }, 404);

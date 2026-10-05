@@ -18,6 +18,13 @@ const asRec = (v: unknown): AnyRec =>
 const str = (v: unknown): string | undefined =>
   typeof v === "string" ? v : v == null ? undefined : String(v);
 const num = (v: unknown): number => (typeof v === "number" ? v : 0);
+// extension meta.device.viewport is {width,height}; strings pass through
+const viewportStr = (v: unknown): string | undefined => {
+  const r = asRec(v);
+  return typeof r.width === "number" && typeof r.height === "number"
+    ? `${r.width}x${r.height}`
+    : str(v);
+};
 
 // "at fn (https://host/app.js:1:234)" or bare "https://host/app.js:1:234"
 const FRAME_URL = /(https?:\/\/[^\s()]+):(\d+):(\d+)/;
@@ -94,13 +101,19 @@ export async function buildAiContext(
       if (m) {
         const map = (await loadMaps()).get(m[1].split("/").pop() ?? m[1]);
         if (map) {
-          const pos = originalPositionFor(map, {
-            line: Number(m[2]),
-            column: Number(m[3]),
-          });
-          if (pos.source != null && pos.line != null) {
-            replaced = `${pos.source}:${pos.line}:${pos.column ?? 0}`;
-            resolvedCount++;
+          try {
+            // V8 stack columns are 1-based; GLINE wants 0-based. Bad or
+            // unresolvable positions (line <= 0 throws) pass through.
+            const pos = originalPositionFor(map, {
+              line: Number(m[2]),
+              column: Number(m[3]) - 1,
+            });
+            if (pos.source != null && pos.line != null) {
+              replaced = `${pos.source}:${pos.line}:${pos.column ?? 0}`;
+              resolvedCount++;
+            }
+          } catch {
+            // passthrough
           }
         }
       }
@@ -130,7 +143,7 @@ export async function buildAiContext(
         url: str(d.url),
         status: num(d.status),
         durationMs: num(d.durationMs),
-        failed: d.failed != null || d.error != null,
+        failed: d.failed === true || d.error != null,
       };
     });
   const network = {
@@ -155,7 +168,7 @@ export async function buildAiContext(
   const device = asRec(meta.device);
   const environment = {
     userAgent: str(meta.userAgent ?? device.userAgent),
-    viewport: str(meta.viewport ?? device.viewport),
+    viewport: viewportStr(meta.viewport ?? device.viewport),
     url: str(meta.url ?? meta.pageUrl ?? device.url),
     language: str(meta.language ?? device.language),
     platform: str(meta.platform ?? device.platform),

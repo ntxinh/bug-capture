@@ -130,9 +130,36 @@ describe("openjam tools", () => {
     expect(out.sizeBytes).toBe(payload.byteLength);
     expect((await stat(out.path)).size).toBe(payload.byteLength);
     expect(await readFile(out.path, "utf8")).toBe('{"events":[1,2,3]}');
+    // cross-origin (S3 presigned) download must NOT carry the PAT
     expect(calls[1].url).toBe("http://cdn.test/replay.json");
-    expect(calls[1].auth).toBe("Bearer tok-123");
+    expect(calls[1].auth).toBeNull();
     await rm(out.path);
+  });
+
+  it("get_replay sends Bearer on same-origin (LocalFs) downloadUrl", async () => {
+    const payload = new TextEncoder().encode("{}");
+    const calls = stubFetch({
+      "http://api.test/api/v1/reports/abc": () =>
+        json({
+          id: "abc",
+          artifacts: [
+            {
+              type: "replay",
+              downloadUrl: "http://api.test/api/v1/uploads/abc/replay.json",
+              sizeBytes: payload.byteLength,
+            },
+          ],
+        }),
+      "http://api.test/api/v1/uploads/abc/replay.json": () =>
+        new Response(payload.slice().buffer),
+    });
+    const client = await connected();
+    await client.callTool({
+      name: "openjam_get_replay",
+      arguments: { reportId: "abc" },
+    });
+    expect(calls[1].url).toBe("http://api.test/api/v1/uploads/abc/replay.json");
+    expect(calls[1].auth).toBe("Bearer tok-123");
   });
 
   it("get_replay surfaces error when no replay artifact", async () => {
@@ -155,6 +182,12 @@ describe("resolveConfig", () => {
     expect(
       resolveConfig({ OPENJAM_URL: "http://x", OPENJAM_TOKEN: "t" }),
     ).toEqual({ baseUrl: "http://x", token: "t" });
+  });
+
+  it("strips trailing slashes from OPENJAM_URL", () => {
+    expect(
+      resolveConfig({ OPENJAM_URL: "http://x///", OPENJAM_TOKEN: "t" }).baseUrl,
+    ).toBe("http://x");
   });
 
   it("throws when env vars missing", () => {
