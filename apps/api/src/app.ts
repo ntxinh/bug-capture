@@ -5,6 +5,7 @@ import { captureSessionsRoutes } from "./routes/capture-sessions";
 import { projectsRoutes } from "./routes/projects";
 import { reportsRoutes } from "./routes/reports";
 import { sharesRoutes } from "./routes/shares";
+import { tokensRoutes } from "./routes/tokens";
 
 export function buildApp(db: Db, auth: Auth, baseUrl: string) {
   const app = new Hono();
@@ -16,5 +17,6 @@ export function buildApp(db: Db, auth: Auth, baseUrl: string) {
   app.route("/api/v1", shares.authed);
   app.route("/", shares.pub);
   app.route("/api/v1/capture-sessions", captureSessionsRoutes(db, auth));
+  app.route("/api/v1/tokens", tokensRoutes(db, auth));
   return app;
 }
