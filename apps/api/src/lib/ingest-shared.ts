@@ -31,6 +31,8 @@ export interface IngestIdentity {
   createdBy: string | null;
   source: string;
   scope: IngestScope;
+  /** Local-store upload URL prefix override (e.g. `${baseUrl}/api/v1/capture/uploads` for the public route). S3 presigned URLs pass through unchanged. */
+  uploadUrlBase?: string;
 }
 
 export const envelopeSchema = z.object({
@@ -155,7 +157,12 @@ export async function handleIngest(
         targets.push({
           artifactId,
           key: t.key,
-          url: t.url,
+          // Local store: the route owns the URL path — capture ingest must
+          // mint under /capture/uploads (public), not the authed /uploads.
+          url:
+            id.uploadUrlBase && storage instanceof LocalFsStorage
+              ? `${id.uploadUrlBase}/${reportId}/${encodeURIComponent(t.key)}`
+              : t.url,
           headers: t.headers,
         });
       }
