@@ -39,6 +39,14 @@
         "playwright": "^1.60.0",
       },
     },
+    "packages/capture-sdk": {
+      "name": "@bugcapture/capture",
+      "version": "0.1.0",
+      "dependencies": {
+        "@bugcapture/redaction": "workspace:*",
+        "rrweb": "^2.0.0",
+      },
+    },
     "packages/db": {
       "name": "@bugcapture/db",
       "version": "0.1.0",
@@ -114,6 +122,8 @@
     "@biomejs/cli-win32-x64": ["@biomejs/cli-win32-x64@2.3.13", "", { "os": "win32", "cpu": "x64" }, "sha512-trDw2ogdM2lyav9WFQsdsfdVy1dvZALymRpgmWsvSez0BJzBjulhOT/t+wyKeh3pZWvwP3VMs1SoOKwO3wecMQ=="],
 
     "@bugcapture/api": ["@bugcapture/api@workspace:apps/api"],
+
+    "@bugcapture/capture": ["@bugcapture/capture@workspace:packages/capture-sdk"],
 
     "@bugcapture/db": ["@bugcapture/db@workspace:packages/db"],
 

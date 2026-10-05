@@ -1,0 +1,15 @@
+{
+  "name": "@bugcapture/capture",
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "check-types": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "rrweb": "^2.0.0",
+    "@bugcapture/redaction": "workspace:*"
+  }
+}
