@@ -34,7 +34,7 @@ const envelopeSchema = z.object({
         z.object({
           kind: z.enum(["replay", "screenshot", "audio", "attachment"]),
           sha256: z.string().regex(/^[0-9a-f]{64}$/),
-          sizeBytes: z.number().int().positive(),
+          sizeBytes: z.number().int().positive().max(2_147_483_647),
         }),
       )
       .max(64)
@@ -107,8 +107,13 @@ export function ingestRoutes(db: Db, auth: Auth, storage: ArtifactStorage) {
           projectId,
           environmentId: environmentId ?? null,
           captureSessionId: captureSessionId ?? null,
-          title: String(summary.title ?? meta.pageTitle ?? "Untitled"),
-          description: String(summary.description ?? meta.url ?? ""),
+          title: String(summary.title ?? meta.pageTitle ?? "Untitled").slice(
+            0,
+            200,
+          ),
+          description: String(
+            summary.description ?? summary.url ?? meta.pageUrl ?? "",
+          ).slice(0, 10000),
           priority,
           source: "extension",
           createdBy: c.var.user.id,
@@ -173,6 +178,9 @@ export function ingestRoutes(db: Db, auth: Auth, storage: ArtifactStorage) {
       .where(eq(reports.id, artifact.reportId));
     if (!rep || rep.organizationId !== c.var.orgId)
       return c.json({ error: "not found" }, 404);
+    const declared = c.req.header("content-length");
+    if (declared != null && Number(declared) !== artifact.sizeBytes)
+      return c.json({ error: "size mismatch" }, 413);
     const body = await c.req.arrayBuffer();
     if (body.byteLength !== artifact.sizeBytes)
       return c.json({ error: "size mismatch" }, 413);

@@ -77,11 +77,24 @@ export function redactReport(report) {
   for (const e of r.events || []) {
     const d = e && e.detail;
     if (!d) continue;
-    if (typeof d.url === "string") d.url = redactUrl(d.url);
+    if (typeof d.url === "string") {
+      d.url = redactUrl(d.url);
+      // network/error titles are "<method> <url>" (cdp.js, inject.js) — the
+      // URL's params would survive detail.url masking via the title.
+      if (typeof e.title === "string") {
+        const i = e.title.indexOf(" ");
+        if (i >= 0 && /^\S+$/.test(e.title.slice(0, i)))
+          e.title = e.title.slice(0, i) + " " + redactUrl(e.title.slice(i + 1));
+      }
+    }
     if (d.requestHeaders) d.requestHeaders = redactHeaders(d.requestHeaders);
     if (d.responseHeaders) d.responseHeaders = redactHeaders(d.responseHeaders);
     if (d.requestBody != null) d.requestBody = redactBody(d.requestBody);
     if (d.responseBody != null) d.responseBody = redactBody(d.responseBody);
+  }
+  for (const k of ["pageUrl", "url", "referrer"]) {
+    const obj = k === "pageUrl" ? r.meta : r.device;
+    if (obj && typeof obj[k] === "string") obj[k] = redactUrl(obj[k]);
   }
   return r;
 }

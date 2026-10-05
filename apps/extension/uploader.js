@@ -58,7 +58,7 @@ export async function uploadReport(report, { apiUrl, token, projectId, environme
     uploads.map(async (u, i) => {
       const p = await fetch(u.url, {
         method: "PUT",
-        headers: { ...u.headers, ...auth },
+        headers: u.url.startsWith(apiUrl) ? { ...u.headers, ...auth } : u.headers,
         body: artifacts[i].bytes,
       });
       if (!p.ok) await fail(p, "upload");

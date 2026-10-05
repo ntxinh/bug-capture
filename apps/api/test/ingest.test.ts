@@ -248,6 +248,17 @@ describe("ingest + upload + finalize", () => {
         },
       });
       expect(res.status).toBe(400);
+      // sizeBytes beyond int32 → 400, not a 500
+      const big = await postJson(ctx.app, cookie, "/api/v1/reports/ingest", {
+        projectId: project.id,
+        envelope: {
+          ...envelope(),
+          artifacts: [
+            { kind: "replay", sha256: sha(BYTES), sizeBytes: 5_000_000_000 },
+          ],
+        },
+      });
+      expect(big.status).toBe(400);
       expect(await res.json()).toMatchObject({ error: "invalid request" });
     } finally {
       await ctx.stop();
@@ -279,6 +290,14 @@ describe("ingest + upload + finalize", () => {
         body: new TextEncoder().encode("x"),
       });
       expect(put413.status).toBe(413);
+
+      // declared content-length mismatch → 413 before the body is read
+      const early413 = await ctx.app.request(upload.url, {
+        method: "PUT",
+        headers: { cookie, "content-length": "1" },
+        body: BYTES,
+      });
+      expect(early413.status).toBe(413);
 
       // finalize still sees it as missing (bad bytes were not stored)
       const fin = await postJson(
