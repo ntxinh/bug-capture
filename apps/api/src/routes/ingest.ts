@@ -13,7 +13,12 @@ import {
 import { requireAuth } from "../lib/session";
 import { zjson } from "../lib/validate";
 
-export function ingestRoutes(db: Db, auth: Auth, storage: ArtifactStorage) {
+export function ingestRoutes(
+  db: Db,
+  auth: Auth,
+  storage: ArtifactStorage,
+  baseUrl: string,
+) {
   const r = new Hono();
   // not "*": mounted at /api/v1, a catch-all would also gate /api/v1/capture/*
   r.use("/reports/*", requireAuth(auth, db));
@@ -29,6 +34,7 @@ export function ingestRoutes(db: Db, auth: Auth, storage: ArtifactStorage) {
         projectId,
         createdBy: c.var.user.id,
         source: "extension",
+        baseUrl,
         scope: { type: "org", orgId: c.var.orgId },
       },
       body,

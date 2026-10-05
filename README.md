@@ -94,6 +94,25 @@ origins via `POST /api/v1/projects/:id/origins` (`{origin:
 origins allows any origin — fine for dev, lock it down before exposing
 publicly. `oj.discard()` stops recording without submitting.
 
+## Integrations (Phase 7)
+
+Per-project integrations live under `POST/PATCH/DELETE
+/api/v1/projects/:id/integrations` — `github` (link reports to upstream
+issues via `POST /api/v1/reports/:id/issues`), `slack`, and `webhook`
+(outbound notifications). Secrets in `config` (`token`, `url`) are
+AES-256-GCM encrypted at rest — set `INTEGRATIONS_KEY` (`openssl rand -hex
+32`) before writing any config with a secret field or the API 503s; reads
+mask them as `"•••"`.
+
+Report events (`report.created` on ingest, `report.resolved` on status→
+resolved, `issue.linked`) are written to `report_outbox_events` inside the
+same transaction as the change and delivered by a 15s-interval worker
+(`OUTBOX_DISABLED=1` to skip). Slack gets `{text:"🐞 <title> — <url>"}`;
+webhooks get `{type, report:{id,title,status,url}, payload}`. Failed
+deliveries retry with 60s×attempts backoff and are marked `failed` after 6
+attempts.
+
+
 ## Docs
 
 - `DESIGN.md` — product design (working spec)

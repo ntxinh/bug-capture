@@ -37,3 +37,9 @@ diagram, §3 core abstractions, §8 remote flow).
   project's `public_key` in `x-openjam-key` + per-project `project_origins`
   CORS/origin allowlist (zero rows → any origin); `projectId` resolves
   server-side from the key, never the body.
+- Integrations (Phase 7): per-project `project_integrations` rows (github /
+  slack / webhook); secrets AES-256-GCM in `config` under `INTEGRATIONS_KEY`,
+  masked on read. Report lifecycle events go through a transactional outbox
+  (`report_outbox_events`, emitted in the same tx as the change) drained by an
+  interval worker — `FOR UPDATE SKIP LOCKED`, exponential-minute backoff,
+  `failed` after 6 attempts.

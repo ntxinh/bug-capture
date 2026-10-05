@@ -11,6 +11,7 @@ import { and, desc, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 import type { Auth } from "../lib/auth";
+import { emitReportEvent } from "../lib/outbox";
 import { isAdmin, isMember, projectInOrg, reportInOrg } from "../lib/policy";
 import { requireAuth } from "../lib/session";
 import { zjson } from "../lib/validate";
@@ -32,7 +33,12 @@ const patchReport = z.object({
   assignedTo: z.string().min(1).nullish(),
 });
 
-export function reportsRoutes(db: Db, auth: Auth, storage: ArtifactStorage) {
+export function reportsRoutes(
+  db: Db,
+  auth: Auth,
+  storage: ArtifactStorage,
+  baseUrl: string,
+) {
   const r = new Hono();
   r.use("*", requireAuth(auth, db));
 
@@ -153,6 +159,12 @@ export function reportsRoutes(db: Db, auth: Auth, storage: ArtifactStorage) {
       .set({ ...body, updatedAt: new Date() })
       .where(eq(reports.id, rep.id))
       .returning();
+    if (body.status === "resolved")
+      await emitReportEvent(db, "report.resolved", rep.id, {
+        title: rep.title,
+        status: "resolved",
+        url: `${baseUrl}/app/report.html?id=${rep.id}`,
+      });
     return c.json(row);
   });
 

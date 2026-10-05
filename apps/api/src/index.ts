@@ -3,6 +3,7 @@ import { LocalFsStorage, S3Storage } from "@bugcapture/storage";
 import { buildApp } from "./app";
 import { env } from "./env";
 import { createAuth } from "./lib/auth";
+import { startOutboxWorker } from "./lib/outbox";
 
 const db = createDb(env.databaseUrl);
 const auth = createAuth(db, env.betterAuthSecret, env.betterAuthUrl);
@@ -20,5 +21,7 @@ const storage =
         env.betterAuthUrl,
       );
 const app = buildApp(db, auth, env.betterAuthUrl, storage);
+if (process.env.OUTBOX_DISABLED !== "1")
+  startOutboxWorker(db, { intervalMs: 15_000 });
 
 export default { port: env.port, fetch: app.fetch };

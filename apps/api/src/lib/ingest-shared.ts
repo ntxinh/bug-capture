@@ -14,6 +14,7 @@ import {
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { isUniqueViolation } from "./errors";
+import { emitReportEvent } from "./outbox";
 import { projectInOrg } from "./policy";
 
 /** Handlers return fetch Responses — routes (or Task 2's capture routes) return them as-is. */
@@ -33,6 +34,8 @@ export interface IngestIdentity {
   scope: IngestScope;
   /** Local-store upload URL prefix override (e.g. `${baseUrl}/api/v1/capture/uploads` for the public route). S3 presigned URLs pass through unchanged. */
   uploadUrlBase?: string;
+  /** Dashboard origin; the outbox `report.created` payload links `${baseUrl}/app/report.html?id=<reportId>`. */
+  baseUrl: string;
 }
 
 export const envelopeSchema = z.object({
@@ -116,16 +119,17 @@ export async function handleIngest(
         typeof summary.priority === "string" && PRIORITIES[summary.priority]
           ? summary.priority
           : "normal";
+      const title = String(summary.title ?? meta.pageTitle ?? "Untitled").slice(
+        0,
+        200,
+      );
       await tx.insert(reports).values({
         id: reportId,
         organizationId: orgId,
         projectId,
         environmentId: environmentId ?? null,
         captureSessionId: captureSessionId ?? null,
-        title: String(summary.title ?? meta.pageTitle ?? "Untitled").slice(
-          0,
-          200,
-        ),
+        title,
         description: String(
           summary.description ?? summary.url ?? meta.pageUrl ?? "",
         ).slice(0, 10000),
@@ -133,6 +137,11 @@ export async function handleIngest(
         source: id.source,
         createdBy: id.createdBy,
         data: envelope,
+      });
+      await emitReportEvent(tx, "report.created", reportId, {
+        title,
+        status: "open",
+        url: `${id.baseUrl}/app/report.html?id=${reportId}`,
       });
       const targets = [];
       for (const a of envelope.artifacts) {

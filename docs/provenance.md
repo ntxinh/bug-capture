@@ -9,6 +9,10 @@
 capture SDK and upload-session flow (key-authed ingest → artifact PUTs →
 finalize) were studied as a behavior reference; no code was copied.
 
+Phase 7 integrations (`project_integrations` configs, github issue linking,
+slack/webhook outbox delivery) also referenced crikket's integration
+behavior — no code copied.
+
 ## Sync procedure
 
 1. `cd ../openjam && git log --oneline <old>..HEAD` — review changes.

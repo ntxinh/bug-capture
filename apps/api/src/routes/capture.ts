@@ -98,6 +98,7 @@ export function captureRoutes(
         source: "sdk",
         scope: { type: "project", projectId: p.id },
         uploadUrlBase: `${baseUrl}/api/v1/capture/uploads`,
+        baseUrl,
       },
       c.req.valid("json"),
     );

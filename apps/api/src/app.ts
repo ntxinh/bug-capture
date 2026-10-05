@@ -27,13 +27,13 @@ export function buildApp(
   app.route("/api/v1/projects", projectsRoutes(db, auth));
   app.route("/api/v1", integrationsRoutes(db, auth));
   app.route("/api/v1", issuesRoutes(db, auth, baseUrl));
-  app.route("/api/v1/reports", reportsRoutes(db, auth, storage));
+  app.route("/api/v1/reports", reportsRoutes(db, auth, storage, baseUrl));
   const shares = sharesRoutes(db, auth, baseUrl);
   app.route("/api/v1", shares.authed);
   app.route("/", shares.pub);
   app.route("/api/v1/capture-sessions", captureSessionsRoutes(db, auth));
   app.route("/api/v1/tokens", tokensRoutes(db, auth));
-  app.route("/api/v1", ingestRoutes(db, auth, storage));
+  app.route("/api/v1", ingestRoutes(db, auth, storage, baseUrl));
   app.route("/api/v1/capture", captureRoutes(db, storage, baseUrl));
   // static mounts — roots resolve relative to apps/api cwd (make dev-api)
   app.use(
