@@ -104,9 +104,9 @@ export const reports = pgTable(
     // status: open | in_progress | resolved | closed | ignored
     priority: text("priority").default("normal").notNull(),
     // priority: low | normal | high | urgent
-    createdBy: text("created_by")
-      .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
+    createdBy: text("created_by").references(() => user.id, {
+      onDelete: "cascade",
+    }),
     assignedTo: text("assigned_to").references(() => user.id, {
       onDelete: "set null",
     }),
