@@ -43,3 +43,11 @@ diagram, §3 core abstractions, §8 remote flow).
   (`report_outbox_events`, emitted in the same tx as the change) drained by an
   interval worker — `FOR UPDATE SKIP LOCKED`, exponential-minute backoff,
   `failed` after 6 attempts.
+- Phase 8: `GET /api/v1/reports/:id/ai-context` (built by
+  `apps/api/src/lib/ai-context.ts`) derives a failure index from the
+  envelope — reproduction steps, symbolicated stacks via release source
+  maps (`releases`/`sourcemaps` tables, maps stored under the
+  `releases/<releaseId>/` ArtifactStorage namespace), network summary,
+  environment. `@bugcapture/mcp` (`packages/mcp`) is a stdio MCP server —
+  PAT `Bearer` against `/api/v1` (`OPENJAM_URL`/`OPENJAM_TOKEN`), exposing
+  list/get/ai-context/replay tools.

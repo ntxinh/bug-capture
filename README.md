@@ -112,6 +112,31 @@ webhooks get `{type, report:{id,title,status,url}, payload}`. Failed
 deliveries retry with 60s×attempts backoff and are marked `failed` after 6
 attempts.
 
+## AI Context + MCP (Phase 8)
+
+`GET /api/v1/reports/:id/ai-context` returns an AI-oriented failure index
+built from the envelope — reproduction steps (events before the first
+error), failures with stacks, network summary, environment, artifact
+links. If the project has a release with uploaded source maps, stacks are
+symbolicated best-effort (`sourceMapsResolved` true only when ≥1 frame
+resolved; missing maps never error).
+
+Releases and source maps:
+
+- `POST /api/v1/releases` — `{projectId, version, environment, commitSha?}` (member write)
+- `GET /api/v1/releases` — list the org's releases (`?projectId=` to filter)
+- `PUT /api/v1/releases/:id/sourcemaps/:filename` — upload a map (≤5 MiB, optional `x-sha256` verified)
+- `GET /api/v1/releases/:id/sourcemaps/:filename` — download
+
+`@bugcapture/mcp` (`packages/mcp`) is a stdio MCP server exposing
+`openjam_list_reports`, `openjam_get_report`, `openjam_get_ai_context` and
+`openjam_get_replay` against a running API:
+
+    OPENJAM_URL=http://localhost:3000 OPENJAM_TOKEN=oj_pat_… bun packages/mcp/src/index.ts
+
+`OPENJAM_TOKEN` is a PAT (`POST /api/v1/tokens`). Wire it into your MCP
+client's stdio config as the command above.
+
 
 ## Docs
 

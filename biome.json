@@ -8,6 +8,6 @@
   },
   "javascript": { "formatter": { "quoteStyle": "double" } },
   "files": {
-    "includes": ["**", "!apps/extension", "!docs/superpowers"]
+    "includes": ["**", "!apps/extension", "!docs/superpowers", "!**/migrations"]
   }
 }
