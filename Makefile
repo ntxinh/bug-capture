@@ -10,7 +10,7 @@ test: build test-unit
 
 test-unit:
 	cd apps/extension && bun test test/
-	bun test packages/report-schema packages/report-core packages/redaction packages/storage packages/capture-sdk
+	bun test packages/report-schema packages/report-core packages/redaction packages/storage packages/capture-sdk packages/mcp
 
 test-api:
 	bun test packages/db/test/ apps/api/test/

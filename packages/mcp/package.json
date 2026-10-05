@@ -1,0 +1,18 @@
+{
+  "name": "@bugcapture/mcp",
+  "version": "0.1.0",
+  "type": "module",
+  "bin": {
+    "bugcapture-mcp": "./src/index.ts"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "check-types": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.25.0",
+    "zod": "4.6.5"
+  }
+}
