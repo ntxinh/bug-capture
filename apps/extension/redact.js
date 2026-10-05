@@ -4,8 +4,9 @@
 export const MASK = "[redacted]";
 
 const MAX_BODY_BYTES = 256 * 1024;
-const HEADER_KEY = /^(authorization|cookie|set-cookie)$/i;
-const PARAM_KEY = /^(password|token|secret|api[-_]?key)$/i;
+const SENSITIVE = /^(authorization|proxy-authorization|cookie|set-cookie|x-api-key|password|token|access_token|refresh_token|secret|client_secret|api[-_]?key)$/i;
+const HEADER_KEY = SENSITIVE;
+const PARAM_KEY = SENSITIVE;
 const MASK_ENC = encodeURIComponent(MASK); // URLSearchParams encodes the brackets
 
 function maskParams(p, keyRe) {
