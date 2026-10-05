@@ -9,6 +9,7 @@ import { ingestRoutes } from "./routes/ingest";
 import { integrationsRoutes } from "./routes/integrations";
 import { issuesRoutes } from "./routes/issues";
 import { projectsRoutes } from "./routes/projects";
+import { releasesRoutes } from "./routes/releases";
 import { reportsRoutes } from "./routes/reports";
 import { sharesRoutes } from "./routes/shares";
 import { tokensRoutes } from "./routes/tokens";
@@ -34,6 +35,7 @@ export function buildApp(
   app.route("/api/v1/capture-sessions", captureSessionsRoutes(db, auth));
   app.route("/api/v1/tokens", tokensRoutes(db, auth));
   app.route("/api/v1", ingestRoutes(db, auth, storage, baseUrl));
+  app.route("/api/v1", releasesRoutes(db, auth, storage));
   app.route("/api/v1/capture", captureRoutes(db, storage, baseUrl));
   // static mounts — roots resolve relative to apps/api cwd (make dev-api)
   app.use(

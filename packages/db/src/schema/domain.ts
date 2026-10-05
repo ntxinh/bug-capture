@@ -252,3 +252,45 @@ export const reportOutboxEvents = pgTable(
     ),
   ],
 );
+
+export const releases = pgTable(
+  "releases",
+  {
+    id: text("id").primaryKey(),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    version: text("version").notNull(),
+    environment: text("environment").notNull(),
+    // environment: e.g. staging | production
+    commitSha: text("commit_sha"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("releases_project_version_env_uidx").on(
+      t.projectId,
+      t.version,
+      t.environment,
+    ),
+  ],
+);
+
+export const sourcemaps = pgTable(
+  "sourcemaps",
+  {
+    id: text("id").primaryKey(),
+    releaseId: text("release_id")
+      .notNull()
+      .references(() => releases.id, { onDelete: "cascade" }),
+    filename: text("filename").notNull(),
+    // e.g. "app.a1b2c3.js"
+    storageKey: text("storage_key").notNull(),
+    // under releases/<releaseId>/ storage namespace
+    sizeBytes: integer("size_bytes").notNull(),
+    sha256: text("sha256").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("sourcemaps_release_filename_uidx").on(t.releaseId, t.filename),
+  ],
+);
