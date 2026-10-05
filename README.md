@@ -42,6 +42,16 @@ The extension works fully offline; the server is an optional destination.
     make dev-api        # hono api on :3000  (/api/auth/*, /api/v1/*)
     make test-api       # api + db tests — needs podman socket + testcontainers env from .env.example
 
+
+## Remote upload (Phase 4)
+
+Mint a PAT via `POST /api/v1/tokens` under session auth (`{label}` → raw
+`oj_pat_…` shown once), then set the viewer's upload config (`apiUrl`,
+`token`, `projectId` — persisted to `chrome.storage.local`). Upload is
+two-phase: `POST /api/v1/reports/ingest` → `PUT` each artifact's bytes →
+`POST /api/v1/reports/:id/finalize`. Artifacts land on local disk
+(`ARTIFACT_DIR`) or S3 via presigned URLs (`S3_*` env).
+
 ## Docs
 
 - `DESIGN.md` — product design (working spec)

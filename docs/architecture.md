@@ -25,3 +25,6 @@ diagram, §3 core abstractions, §8 remote flow).
   `ArtifactStorage`; auth → Better Auth (auth tables separate from domain).
 - `apps/api` (Hono) → `packages/db` (Drizzle→Postgres); auth tables owned by
   Better Auth; policy layer enforces org scope, 404-not-403 for cross-org.
+- `@bugcapture/storage` `ArtifactStorage`: local fs (`ARTIFACT_DIR`) or S3
+  presign (`S3_*`); PAT `Bearer` auth in `requireAuth`; uploads two-phase —
+  ingest → `PUT` artifact bytes → finalize.
