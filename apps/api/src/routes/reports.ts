@@ -10,6 +10,7 @@ import type { ArtifactStorage } from "@bugcapture/storage";
 import { and, desc, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
+import { buildAiContext } from "../lib/ai-context";
 import type { Auth } from "../lib/auth";
 import { emitReportEvent } from "../lib/outbox";
 import { isAdmin, isMember, projectInOrg, reportInOrg } from "../lib/policy";
@@ -106,6 +107,24 @@ export function reportsRoutes(
       .where(and(...conds))
       .orderBy(desc(reports.createdAt));
     return c.json(rows);
+  });
+
+  r.get("/:id/ai-context", async (c) => {
+    const rep = await reportInOrg(db, c.var.orgId, c.req.param("id"));
+    if (!rep) return c.json({ error: "not found" }, 404);
+    const artifacts = await db
+      .select()
+      .from(reportArtifacts)
+      .where(eq(reportArtifacts.reportId, rep.id))
+      .then((rows) =>
+        Promise.all(
+          rows.map(async (a) => ({
+            ...a,
+            downloadUrl: await storage.getDownloadUrl(rep.id, a.storageKey),
+          })),
+        ),
+      );
+    return c.json(await buildAiContext(db, storage, rep, artifacts));
   });
 
   r.get("/:id", async (c) => {
