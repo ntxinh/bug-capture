@@ -190,27 +190,37 @@ describe("public capture routes", () => {
         projectId: project.id,
         origin: "https://ok.test",
       });
-      const preflight = (origin: string, key = project.publicKey) =>
+      const preflight = (origin: string, key?: string) =>
         ctx.app.request("/api/v1/capture/ingest", {
           method: "OPTIONS",
           headers: {
             origin,
-            "x-openjam-key": key,
+            ...(key ? { "x-openjam-key": key } : {}),
             "access-control-request-method": "POST",
             "access-control-request-headers": "x-openjam-key",
           },
         });
 
-      const ok = await preflight("https://ok.test");
+      const ok = await preflight("https://ok.test", project.publicKey);
       expect(ok.headers.get("access-control-allow-origin")).toBe(
         "https://ok.test",
       );
 
-      const evil = await preflight("https://evil.test");
+      const evil = await preflight("https://evil.test", project.publicKey);
       expect(evil.headers.get("access-control-allow-origin")).toBeNull();
 
+      // Preflights never gate access — with a bad key (or none, as real
+      // browsers send) the origin is echoed and the actual request still
+      // fails auth in the middleware.
       const badKey = await preflight("https://ok.test", "oj_pk_nope");
-      expect(badKey.headers.get("access-control-allow-origin")).toBeNull();
+      expect(badKey.headers.get("access-control-allow-origin")).toBe(
+        "https://ok.test",
+      );
+
+      const noKey = await preflight("https://whatever.test");
+      expect(noKey.headers.get("access-control-allow-origin")).toBe(
+        "https://whatever.test",
+      );
     } finally {
       await ctx.stop();
     }

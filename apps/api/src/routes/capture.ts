@@ -63,7 +63,12 @@ export function captureRoutes(
     cors({
       origin: async (origin, c) => {
         const p = await resolveKey(db, c);
-        if (!p) return null;
+        if (!p) {
+          // Browser preflights never carry x-openjam-key — echo the origin so
+          // the real request can be sent; the middleware still enforces
+          // key+origin on it.
+          return c.req.header("access-control-request-method") ? origin : null;
+        }
         return (await originAllowed(db, p.id, origin)) ? origin : null;
       },
       allowMethods: ["POST", "PUT", "OPTIONS"],
