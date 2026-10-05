@@ -6,7 +6,8 @@ export interface S3StorageConfig {
   bucket: string;
   accessKeyId: string;
   secretAccessKey: string;
-  urlTtlSeconds: number;
+  // ponytail: aws4fetch hardcodes X-Amz-Expires=86400 — no ttl knob; add
+  // custom signing only if a shorter ttl is ever needed.
 }
 
 export class S3Storage implements ArtifactStorage {
