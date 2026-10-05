@@ -4,7 +4,7 @@ import { and, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 import type { Auth } from "../lib/auth";
-import { sealSecret } from "../lib/crypto";
+import { maskConfig, sealConfig } from "../lib/integration-config";
 import { isAdmin, projectInOrg } from "../lib/policy";
 import { requireAuth } from "../lib/session";
 import { zjson } from "../lib/validate";
@@ -18,7 +18,6 @@ const providerSchemas = {
   slack: z.object({ url: z.string().url().startsWith("https://") }),
   webhook: z.object({ url: z.string().url() }),
 };
-const SECRET_KEYS = new Set(["token", "url"]);
 
 const postBody = z.object({
   provider: z.enum(["github", "slack", "webhook"]),
@@ -30,24 +29,6 @@ const patchBody = z
     config: z.record(z.string(), z.unknown()).optional(),
   })
   .refine((b) => b.enabled !== undefined || b.config !== undefined);
-
-function sealConfig(cfg: Record<string, unknown>) {
-  const out = { ...cfg };
-  for (const k of Object.keys(out)) {
-    if (SECRET_KEYS.has(k) && typeof out[k] === "string") {
-      out[k] = sealSecret(out[k] as string); // getKey() throws if unconfigured
-    }
-  }
-  return out;
-}
-
-function maskConfig(cfg: Record<string, unknown>) {
-  const out = { ...cfg };
-  for (const k of Object.keys(out)) {
-    if (SECRET_KEYS.has(k)) out[k] = "•••";
-  }
-  return out;
-}
 
 const present = (r: {
   id: string;

@@ -7,6 +7,7 @@ import { captureRoutes } from "./routes/capture";
 import { captureSessionsRoutes } from "./routes/capture-sessions";
 import { ingestRoutes } from "./routes/ingest";
 import { integrationsRoutes } from "./routes/integrations";
+import { issuesRoutes } from "./routes/issues";
 import { projectsRoutes } from "./routes/projects";
 import { reportsRoutes } from "./routes/reports";
 import { sharesRoutes } from "./routes/shares";
@@ -25,6 +26,7 @@ export function buildApp(
   app.get("/healthz", (c) => c.json({ ok: true }));
   app.route("/api/v1/projects", projectsRoutes(db, auth));
   app.route("/api/v1", integrationsRoutes(db, auth));
+  app.route("/api/v1", issuesRoutes(db, auth, baseUrl));
   app.route("/api/v1/reports", reportsRoutes(db, auth, storage));
   const shares = sharesRoutes(db, auth, baseUrl);
   app.route("/api/v1", shares.authed);
