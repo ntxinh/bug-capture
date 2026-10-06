@@ -96,10 +96,7 @@ $("project-form").addEventListener("submit", async (e) => {
 
 let currentProjectId = null;
 
-// ponytail: type is derived — the API/store have no type column; github is
-// the only "integration", the rest are notification channels.
-const providerType = (provider) =>
-  provider === "github" ? "integration" : "notification";
+
 
 async function loadReports(project) {
   currentProjectId = project.id;
@@ -176,7 +173,6 @@ async function loadIntegrations() {
       };
       delCell.append(del);
       tr.append(
-        td(providerType(i.provider)),
         td(i.provider),
         enabledCell,
         td(Object.keys(i.config ?? {}).join(", ") || "—"),
@@ -187,9 +183,6 @@ async function loadIntegrations() {
   );
 }
 
-$("integration-form").provider.addEventListener("change", (e) => {
-  e.target.form.type.value = providerType(e.target.value);
-});
 
 $("integration-form").addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -208,7 +201,6 @@ $("integration-form").addEventListener("submit", async (e) => {
       body: JSON.stringify({ provider, config: parsed }),
     });
     e.target.reset();
-    e.target.type.value = providerType(e.target.provider.value);
     await loadIntegrations();
   } catch (err) {
     $("integration-error").textContent = `Save failed (${err.status})`;
