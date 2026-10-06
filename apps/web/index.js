@@ -96,8 +96,6 @@ $("project-form").addEventListener("submit", async (e) => {
 
 let currentProjectId = null;
 
-
-
 async function loadReports(project) {
   currentProjectId = project.id;
   $("reports-project").textContent = project.name;
@@ -182,7 +180,6 @@ async function loadIntegrations() {
     }),
   );
 }
-
 
 $("integration-form").addEventListener("submit", async (e) => {
   e.preventDefault();
