@@ -200,7 +200,8 @@ $("integration-form").addEventListener("submit", async (e) => {
     e.target.reset();
     await loadIntegrations();
   } catch (err) {
-    $("integration-error").textContent = `Save failed (${err.status})`;
+    $("integration-error").textContent =
+      `Save failed (${err.status ?? "network"})`;
   }
 });
 

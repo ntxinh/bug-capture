@@ -13,7 +13,9 @@ const clientIp = (c: Context): string =>
 
 /**
  * In-memory sliding-window limiter. Prune-on-touch: expired timestamps are
- * dropped when a key is next seen, so the map stays bounded by active keys.
+ * dropped when a key is next seen and empty keys are deleted. When the map
+ * exceeds 10k distinct keys (spoofed-key flood), a sweep pass evicts all
+ * expired entries before the new one is recorded.
  */
 export function rateLimiter({
   windowMs = 60_000,
@@ -29,6 +31,14 @@ export function rateLimiter({
     const now = Date.now();
     const key = `${c.req.method}:${c.req.header("x-openjam-key") ?? clientIp(c)}`;
     const arr = (hits.get(key) ?? []).filter((t) => now - t < windowMs);
+    if (arr.length === 0) hits.delete(key);
+    if (hits.size > 10_000) {
+      for (const [k, v] of hits) {
+        const live = v.filter((t) => now - t < windowMs);
+        if (live.length === 0) hits.delete(k);
+        else hits.set(k, live);
+      }
+    }
     if (arr.length >= limit) {
       const retryAfter = Math.ceil(((arr[0] ?? now) + windowMs - now) / 1000);
       return c.json({ error: "rate_limited" }, 429, {
