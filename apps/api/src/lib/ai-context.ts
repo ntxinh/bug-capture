@@ -2,7 +2,7 @@ import type { Db } from "@bugcapture/db";
 import { releases, type reports, sourcemaps } from "@bugcapture/db/schema";
 import { type ArtifactStorage, LocalFsStorage } from "@bugcapture/storage";
 import { originalPositionFor, TraceMap } from "@jridgewell/trace-mapping";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 
 type ReportRow = typeof reports.$inferSelect;
 type AnyRec = Record<string, unknown>;
@@ -39,28 +39,56 @@ export async function buildAiContext(
   storage: ArtifactStorage,
   rep: ReportRow,
   artifacts: AiContextArtifact[],
+  opts: { from?: number; to?: number } = {},
 ): Promise<object> {
   const envelope = asRec(rep.data);
   const summary = asRec(envelope.summary);
   const meta = asRec(envelope.meta);
   const events = (Array.isArray(envelope.events) ? envelope.events : [])
     .map(asRec)
+    // ?from/?to bound the event window BEFORE failures/network/console/
+    // reproduction are computed; summary/artifacts stay report-scope.
+    .filter(
+      (e) =>
+        (opts.from == null || num(e.rel) >= opts.from) &&
+        (opts.to == null || num(e.rel) <= opts.to),
+    )
     .sort((a, b) => num(a.rel) - num(b.rel));
 
-  // Newest release of the report's project (spec §3: maps churn slower than
-  // releases, so the newest is the documented fallback).
+  // Release pick: (1) exact (projectId, meta.version, meta.environment)
+  // match when the envelope carries both fields; (2) otherwise the newest
+  // release of the project — spec §3: maps churn slower than releases, so
+  // the newest is the documented fallback.
   let maps: Map<string, TraceMap | null> | null = null;
   let resolvedCount = 0;
   const loadMaps = async () => {
     if (maps) return maps;
     const cache = new Map<string, TraceMap | null>();
     maps = cache;
-    const [rel] = await db
-      .select({ id: releases.id })
-      .from(releases)
-      .where(eq(releases.projectId, rep.projectId))
-      .orderBy(desc(releases.createdAt))
-      .limit(1);
+    const version = str(meta.version);
+    const environment = str(meta.environment);
+    let rel: { id: string } | undefined;
+    if (version && environment) {
+      [rel] = await db
+        .select({ id: releases.id })
+        .from(releases)
+        .where(
+          and(
+            eq(releases.projectId, rep.projectId),
+            eq(releases.version, version),
+            eq(releases.environment, environment),
+          ),
+        )
+        .limit(1);
+    }
+    if (!rel) {
+      [rel] = await db
+        .select({ id: releases.id })
+        .from(releases)
+        .where(eq(releases.projectId, rep.projectId))
+        .orderBy(desc(releases.createdAt))
+        .limit(1);
+    }
     if (!rel) return cache;
     const rows = await db
       .select()

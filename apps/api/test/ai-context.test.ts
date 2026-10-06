@@ -163,6 +163,7 @@ async function ingestReport(
   cookie: string,
   projectId: string,
   events: unknown[] = baseEvents(),
+  meta: Record<string, unknown> = {},
 ) {
   const res = await postJson(ctx.app, cookie, "/api/v1/reports/ingest", {
     projectId,
@@ -175,6 +176,7 @@ async function ingestReport(
         device: { viewport: { width: 100, height: 200 } },
         capturedAt: 999,
         durationMs: 1234,
+        ...meta,
       },
       events,
       artifacts: [
@@ -204,10 +206,16 @@ async function ingestReport(
   return body.reportId;
 }
 
-const getAiCtx = async (ctx: TestCtx, cookie: string, reportId: string) => {
-  const res = await ctx.app.request(`/api/v1/reports/${reportId}/ai-context`, {
-    headers: { cookie },
-  });
+const getAiCtx = async (
+  ctx: TestCtx,
+  cookie: string,
+  reportId: string,
+  qs = "",
+) => {
+  const res = await ctx.app.request(
+    `/api/v1/reports/${reportId}/ai-context${qs}`,
+    { headers: { cookie } },
+  );
   return { res, ctx: aiCtxSchema.parse(await res.json()) };
 };
 
@@ -347,6 +355,118 @@ describe("GET /reports/:id/ai-context", () => {
         headers: { cookie },
       });
       expect(res.status).toBe(404);
+    } finally {
+      await ctx.stop();
+    }
+  }, 120_000);
+
+  it("?from/?to bound the event window before failures/network/reproduction", async () => {
+    const ctx = await withTestDb();
+    try {
+      const { cookie } = await signUpAndOrg(ctx.app);
+      const project = await createProject(ctx, cookie);
+      const reportId = await ingestReport(ctx, cookie, project.id);
+
+      // from=100&to=250 keeps rel 100,150,200 and drops the rel=400 failure
+      const { ctx: win } = await getAiCtx(
+        ctx,
+        cookie,
+        reportId,
+        "?from=100&to=250",
+      );
+      expect(win.failures).toHaveLength(0);
+      expect(win.network.failures).toEqual([
+        { method: "GET", url: "/api/flaky", status: 0, durationMs: 30 },
+      ]);
+      expect(win.console).toEqual({ errors: 1, warnings: 0 });
+      expect(win.reproduction.map((e) => e.rel)).toEqual([100, 150, 200]);
+      // report-scope fields are unaffected by the window
+      expect(win.summary.durationMs).toBe(1234);
+
+      // to alone excludes the failure; reproduction reflects the bound
+      const { ctx: toOnly } = await getAiCtx(ctx, cookie, reportId, "?to=350");
+      expect(toOnly.failures).toHaveLength(0);
+      expect(toOnly.reproduction.map((e) => e.rel)).toEqual([
+        0, 100, 150, 200, 300,
+      ]);
+    } finally {
+      await ctx.stop();
+    }
+  }, 120_000);
+
+  it("non-numeric or negative ?from/?to → 400", async () => {
+    const ctx = await withTestDb();
+    try {
+      const { cookie } = await signUpAndOrg(ctx.app);
+      const project = await createProject(ctx, cookie);
+      const reportId = await ingestReport(ctx, cookie, project.id);
+      for (const qs of ["?from=abc", "?to=-5"]) {
+        const res = await ctx.app.request(
+          `/api/v1/reports/${reportId}/ai-context${qs}`,
+          { headers: { cookie } },
+        );
+        expect(res.status).toBe(400);
+      }
+    } finally {
+      await ctx.stop();
+    }
+  }, 120_000);
+
+  it("exact version+environment release match wins over newest fallback", async () => {
+    const ctx = await withTestDb();
+    try {
+      const { cookie } = await signUpAndOrg(ctx.app);
+      const project = await createProject(ctx, cookie);
+      const reportId = await ingestReport(
+        ctx,
+        cookie,
+        project.id,
+        baseEvents(),
+        { version: "1.0.0", environment: "production" },
+      );
+
+      // older release matching (version, environment): app.js → src/app.ts
+      const relA = await postJson(ctx.app, cookie, "/api/v1/releases", {
+        projectId: project.id,
+        version: "1.0.0",
+        environment: "production",
+      });
+      const { id: relAId } = z
+        .object({ id: z.string() })
+        .parse(await relA.json());
+      const putA = await ctx.app.request(
+        `/api/v1/releases/${relAId}/sourcemaps/app.js`,
+        { method: "PUT", headers: { cookie }, body: MAP_BYTES },
+      );
+      expect(putA.status).toBe(201);
+
+      // newest release mismatches: its map would resolve to src/wrong.ts —
+      // the exact (projectId, version, environment) match must win anyway
+      const relB = await postJson(ctx.app, cookie, "/api/v1/releases", {
+        projectId: project.id,
+        version: "2.0.0",
+        environment: "production",
+      });
+      const { id: relBId } = z
+        .object({ id: z.string() })
+        .parse(await relB.json());
+      const wrongMap = new TextEncoder().encode(
+        JSON.stringify({
+          version: 3,
+          sources: ["src/wrong.ts"],
+          names: [],
+          mappings: "AAAA",
+        }),
+      );
+      const putB = await ctx.app.request(
+        `/api/v1/releases/${relBId}/sourcemaps/app.js`,
+        { method: "PUT", headers: { cookie }, body: wrongMap },
+      );
+      expect(putB.status).toBe(201);
+
+      const { ctx: c } = await getAiCtx(ctx, cookie, reportId);
+      expect(c.sourceMapsResolved).toBe(true);
+      expect(c.failures[0].stack[0]).toBe("src/app.ts:1:0");
     } finally {
       await ctx.stop();
     }

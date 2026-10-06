@@ -109,23 +109,36 @@ export function reportsRoutes(
     return c.json(rows);
   });
 
-  r.get("/:id/ai-context", async (c) => {
-    const rep = await reportInOrg(db, c.var.orgId, c.req.param("id"));
-    if (!rep) return c.json({ error: "not found" }, 404);
-    const artifacts = await db
-      .select()
-      .from(reportArtifacts)
-      .where(eq(reportArtifacts.reportId, rep.id))
-      .then((rows) =>
-        Promise.all(
-          rows.map(async (a) => ({
-            ...a,
-            downloadUrl: await storage.getDownloadUrl(rep.id, a.storageKey),
-          })),
-        ),
+  r.get(
+    "/:id/ai-context",
+    zjson(
+      "query",
+      z.object({
+        from: z.coerce.number().nonnegative().optional(),
+        to: z.coerce.number().nonnegative().optional(),
+      }),
+    ),
+    async (c) => {
+      const rep = await reportInOrg(db, c.var.orgId, c.req.param("id"));
+      if (!rep) return c.json({ error: "not found" }, 404);
+      const artifacts = await db
+        .select()
+        .from(reportArtifacts)
+        .where(eq(reportArtifacts.reportId, rep.id))
+        .then((rows) =>
+          Promise.all(
+            rows.map(async (a) => ({
+              ...a,
+              downloadUrl: await storage.getDownloadUrl(rep.id, a.storageKey),
+            })),
+          ),
+        );
+      const { from, to } = c.req.valid("query");
+      return c.json(
+        await buildAiContext(db, storage, rep, artifacts, { from, to }),
       );
-    return c.json(await buildAiContext(db, storage, rep, artifacts));
-  });
+    },
+  );
 
   r.get("/:id", async (c) => {
     const rep = await reportInOrg(db, c.var.orgId, c.req.param("id"));
