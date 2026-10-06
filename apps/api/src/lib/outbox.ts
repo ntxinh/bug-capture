@@ -5,6 +5,7 @@ import {
   reports,
 } from "@bugcapture/db/schema";
 import { and, eq, sql } from "drizzle-orm";
+import { env } from "../env";
 import { unsealConfig } from "./integration-config";
 // Pick<Db,"insert"> so callers inside db.transaction(tx => …) can pass tx.
 export async function emitReportEvent(
@@ -74,9 +75,38 @@ export async function drainOutbox(
       : [];
     const payload = evt.payload as Record<string, unknown>;
     try {
+      let outcome: "sent" | "skipped" = "sent";
       for (const int of ints) {
-        if (int.provider !== "slack" && int.provider !== "webhook") continue;
+        if (
+          int.provider !== "slack" &&
+          int.provider !== "webhook" &&
+          int.provider !== "email"
+        )
+          continue;
         const cfg = unsealConfig(int.config as Record<string, unknown>);
+        if (int.provider === "email") {
+          // no key → terminal skip; retrying can't conjure env config
+          if (!env.resendApiKey) {
+            outcome = "skipped";
+            continue;
+          }
+          const res = await fetchImpl("https://api.resend.com/emails", {
+            method: "POST",
+            headers: {
+              "content-type": "application/json",
+              authorization: `Bearer ${env.resendApiKey}`,
+            },
+            body: JSON.stringify({
+              from: cfg.from,
+              to: cfg.to,
+              subject: `[${payload.status ?? evt.type}] ${payload.title}`,
+              html: `<a href="${payload.url}">view report</a>`,
+            }),
+            signal: AbortSignal.timeout(10_000),
+          });
+          if (!res.ok) throw new Error(`resend post ${res.status}`);
+          continue;
+        }
         const body =
           int.provider === "slack"
             ? { text: `🐞 ${payload.title} — ${payload.url}` }
@@ -100,9 +130,12 @@ export async function drainOutbox(
       }
       await db
         .update(reportOutboxEvents)
-        .set({ status: "sent", sentAt: new Date() })
+        .set({
+          status: outcome,
+          ...(outcome === "sent" ? { sentAt: new Date() } : {}),
+        })
         .where(eq(reportOutboxEvents.id, evt.id));
-      sent++;
+      if (outcome === "sent") sent++;
     } catch (e) {
       const attempts = evt.attempts + 1;
       await db

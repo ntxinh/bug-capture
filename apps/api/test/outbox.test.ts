@@ -8,6 +8,7 @@ import { signUpAndOrg, type TestCtx, withTestDb } from "./helpers";
 
 const KEY = "cd".repeat(32);
 const ORIG_KEY = process.env.INTEGRATIONS_KEY;
+const ORIG_RESEND = process.env.RESEND_API_KEY;
 
 let ctx: TestCtx;
 let cookie: string;
@@ -21,6 +22,8 @@ afterAll(async () => {
   await ctx.stop();
   if (ORIG_KEY === undefined) delete process.env.INTEGRATIONS_KEY;
   else process.env.INTEGRATIONS_KEY = ORIG_KEY;
+  if (ORIG_RESEND === undefined) delete process.env.RESEND_API_KEY;
+  else process.env.RESEND_API_KEY = ORIG_RESEND;
 });
 
 async function createProject(slug: string) {
@@ -61,6 +64,16 @@ async function addIntegration(
     projectId,
     provider,
     config: sealConfig({ url }),
+    enabled: true,
+  });
+}
+
+async function addEmailIntegration(projectId: string) {
+  await ctx.db.insert(projectIntegrations).values({
+    id: crypto.randomUUID(),
+    projectId,
+    provider: "email",
+    config: sealConfig({ from: "bugs@acme.test", to: ["dev@acme.test"] }),
     enabled: true,
   });
 }
@@ -248,5 +261,64 @@ describe("outbox", () => {
       (e) => e.type === "report.resolved",
     );
     expect(resolved2.length).toBe(2);
+  });
+
+  it("drain posts to Resend for email integrations", async () => {
+    const p = await createProject("o-email");
+    const { reportId } = await ingest(p.id, "Mail bug");
+    await addEmailIntegration(p.id);
+
+    process.env.RESEND_API_KEY = "rk_test_123";
+    try {
+      const calls: {
+        url: string;
+        headers: Record<string, string>;
+        body: Record<string, unknown>;
+      }[] = [];
+      // drainOutbox drains every due row globally — earlier tests leave
+      // pending report.resolved rows, so assert the resend call + status,
+      // not the sent count
+      await drainOutbox(ctx.db, {
+        fetchImpl: async (url, init) => {
+          calls.push({
+            url: String(url),
+            headers: init?.headers as Record<string, string>,
+            body: JSON.parse(String(init?.body)),
+          });
+          return new Response("ok");
+        },
+      });
+      expect(calls.length).toBe(1);
+      expect(calls[0].url).toBe("https://api.resend.com/emails");
+      expect(calls[0].headers.authorization).toBe("Bearer rk_test_123");
+      expect(calls[0].body).toEqual({
+        from: "bugs@acme.test",
+        to: ["dev@acme.test"],
+        subject: "[open] Mail bug",
+        html: `<a href="http://localhost:3000/app/report.html?id=${reportId}">view report</a>`,
+      });
+      const [after] = await outboxRows(reportId);
+      expect(after.status).toBe("sent");
+    } finally {
+      delete process.env.RESEND_API_KEY;
+    }
+  });
+
+  it("email integration with no RESEND_API_KEY marks the event skipped", async () => {
+    const p = await createProject("o-nokey");
+    const { reportId } = await ingest(p.id);
+    await addEmailIntegration(p.id);
+    delete process.env.RESEND_API_KEY;
+
+    const calls: unknown[] = [];
+    await drainOutbox(ctx.db, {
+      fetchImpl: async (url) => {
+        calls.push(url);
+        return new Response("ok");
+      },
+    });
+    expect(calls.length).toBe(0);
+    const [row] = await outboxRows(reportId);
+    expect(row.status).toBe("skipped");
   });
 });

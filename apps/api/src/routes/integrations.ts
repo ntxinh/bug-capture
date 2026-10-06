@@ -17,10 +17,14 @@ const providerSchemas = {
   }),
   slack: z.object({ url: z.string().url().startsWith("https://") }),
   webhook: z.object({ url: z.string().url() }),
+  email: z.object({
+    from: z.string().email(),
+    to: z.array(z.string().email()).min(1),
+  }),
 };
 
 const postBody = z.object({
-  provider: z.enum(["github", "slack", "webhook"]),
+  provider: z.enum(["github", "slack", "webhook", "email"]),
   config: z.record(z.string(), z.unknown()),
 });
 const patchBody = z

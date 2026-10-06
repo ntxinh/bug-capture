@@ -314,4 +314,45 @@ describe("integrations", () => {
       await ctx.stop();
     }
   }, 120_000);
+
+  it("email provider POST validates config and returns 201", async () => {
+    const ctx = await withTestDb();
+    try {
+      const { cookie } = await signUpAndOrg(ctx.app);
+      const p = await createProject(ctx.app, cookie);
+
+      for (const config of [
+        { from: "not-an-email", to: ["dev@acme.test"] },
+        { from: "bugs@acme.test", to: [] },
+        { from: "bugs@acme.test", to: ["nope"] },
+      ]) {
+        const res = await postInt(ctx.app, cookie, p.id, {
+          provider: "email",
+          config,
+        });
+        expect(res.status).toBe(400);
+      }
+
+      const created = await postInt(ctx.app, cookie, p.id, {
+        provider: "email",
+        config: {
+          from: "bugs@acme.test",
+          to: ["dev@acme.test", "ops@acme.test"],
+        },
+      });
+      expect(created.status).toBe(201);
+      const body = z
+        .object({ id: z.string(), provider: z.literal("email") })
+        .parse(await created.json());
+      expect(body.provider).toBe("email");
+
+      const list = z
+        .array(z.object({ config: z.record(z.string(), z.unknown()) }))
+        .parse(await (await listInt(ctx.app, cookie, p.id)).json());
+      expect(list[0].config.from).toBe("bugs@acme.test");
+      expect(list[0].config.to).toEqual(["dev@acme.test", "ops@acme.test"]);
+    } finally {
+      await ctx.stop();
+    }
+  }, 120_000);
 });
