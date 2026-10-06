@@ -51,3 +51,9 @@ diagram, §3 core abstractions, §8 remote flow).
   environment. `@bugcapture/mcp` (`packages/mcp`) is a stdio MCP server —
   PAT `Bearer` against `/api/v1` (`OPENJAM_URL`/`OPENJAM_TOKEN`), exposing
   list/get/ai-context/replay tools.
+- Phase 9: `/api/v1/capture/*` is rate-limited by `lib/rate-limit.ts`
+  (in-memory sliding window, OPTIONS exempt, `RATE_LIMIT_DISABLED=1`
+  bypasses); the `email` integration provider drains via Resend
+  (`RESEND_API_KEY`); `ai-context` takes `?from`/`?to` event windows; the
+  dashboard reports view (`apps/web/index.html`) gains a per-project
+  integrations settings section.

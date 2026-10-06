@@ -98,11 +98,13 @@ publicly. `oj.discard()` stops recording without submitting.
 
 Per-project integrations live under `POST/PATCH/DELETE
 /api/v1/projects/:id/integrations` — `github` (link reports to upstream
-issues via `POST /api/v1/reports/:id/issues`), `slack`, and `webhook`
-(outbound notifications). Secrets in `config` (`token`, `url`) are
+issues via `POST /api/v1/reports/:id/issues`), `slack`, `webhook`, and
+`email` (outbound notifications). Secrets in `config` (`token`, `url`) are
 AES-256-GCM encrypted at rest — set `INTEGRATIONS_KEY` (`openssl rand -hex
 32`) before writing any config with a secret field or the API 503s; reads
-mask them as `"•••"`.
+mask them as `"•••"`. The dashboard shows a per-project Integrations
+section under a project's reports view (`/app/index.html`) for listing,
+toggling, adding, and deleting them.
 
 Report events (`report.created` on ingest, `report.resolved` on status→
 resolved, `issue.linked`) are written to `report_outbox_events` inside the
@@ -136,6 +138,17 @@ Releases and source maps:
 
 `OPENJAM_TOKEN` is a PAT (`POST /api/v1/tokens`). Wire it into your MCP
 client's stdio config as the command above.
+
+## Phase 9 polish
+
+- **Rate limiting** — `/api/v1/capture/*` is rate-limited in-process
+  (sliding window); `OPTIONS` exempt, `RATE_LIMIT_DISABLED=1` bypasses.
+- **Email channel** — the `email` integration provider delivers outbox
+  events via Resend (`RESEND_API_KEY`; missing key → delivery marked
+  `skipped`).
+- **AI context windows** — `GET /api/v1/reports/:id/ai-context` accepts
+  `?from`/`?to` to window events, and release matching prefers exact
+  `meta.version`/`meta.environment` hits.
 
 
 ## Docs

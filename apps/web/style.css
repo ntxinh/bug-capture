@@ -35,7 +35,9 @@ form {
   flex-wrap: wrap;
   margin: 0.5rem 0;
 }
-input {
+input,
+select,
+textarea {
   padding: 0.4rem 0.6rem;
   border: 1px solid #c8c8d0;
   border-radius: 4px;

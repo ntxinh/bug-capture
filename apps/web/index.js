@@ -94,7 +94,15 @@ $("project-form").addEventListener("submit", async (e) => {
   }
 });
 
+let currentProjectId = null;
+
+// ponytail: type is derived — the API/store have no type column; github is
+// the only "integration", the rest are notification channels.
+const providerType = (provider) =>
+  provider === "github" ? "integration" : "notification";
+
 async function loadReports(project) {
+  currentProjectId = project.id;
   $("reports-project").textContent = project.name;
   const reports = await api(`/api/v1/reports?projectId=${project.id}`);
   $("report-rows").replaceChildren(
@@ -120,7 +128,92 @@ async function loadReports(project) {
     }),
   );
   show("reports");
+  loadIntegrations().catch((err) => {
+    $("integration-error").textContent = `Load failed (${err.status})`;
+  });
 }
+
+async function loadIntegrations() {
+  $("integration-error").textContent = "";
+  const integrations = await api(
+    `/api/v1/projects/${currentProjectId}/integrations`,
+  );
+  $("integration-rows").replaceChildren(
+    ...integrations.map((i) => {
+      const tr = document.createElement("tr");
+      const td = (text) => {
+        const cell = document.createElement("td");
+        cell.textContent = text ?? "";
+        return cell;
+      };
+      const enabledCell = document.createElement("td");
+      const cb = document.createElement("input");
+      cb.type = "checkbox";
+      cb.checked = i.enabled;
+      cb.onchange = async () => {
+        try {
+          await api(`/api/v1/integrations/${i.id}`, {
+            method: "PATCH",
+            body: JSON.stringify({ enabled: cb.checked }),
+          });
+        } catch (err) {
+          cb.checked = !cb.checked;
+          $("integration-error").textContent = `Update failed (${err.status})`;
+        }
+      };
+      enabledCell.append(cb);
+      const delCell = document.createElement("td");
+      const del = document.createElement("button");
+      del.textContent = "delete";
+      del.onclick = async () => {
+        $("integration-error").textContent = "";
+        try {
+          await api(`/api/v1/integrations/${i.id}`, { method: "DELETE" });
+          await loadIntegrations();
+        } catch (err) {
+          $("integration-error").textContent = `Delete failed (${err.status})`;
+        }
+      };
+      delCell.append(del);
+      tr.append(
+        td(providerType(i.provider)),
+        td(i.provider),
+        enabledCell,
+        td(Object.keys(i.config ?? {}).join(", ") || "—"),
+        delCell,
+      );
+      return tr;
+    }),
+  );
+}
+
+$("integration-form").provider.addEventListener("change", (e) => {
+  e.target.form.type.value = providerType(e.target.value);
+});
+
+$("integration-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  $("integration-error").textContent = "";
+  const { provider, config } = Object.fromEntries(new FormData(e.target));
+  try {
+    let parsed = {};
+    try {
+      parsed = config.trim() ? JSON.parse(config) : {};
+    } catch {
+      $("integration-error").textContent = "Config must be valid JSON";
+      return;
+    }
+    await api(`/api/v1/projects/${currentProjectId}/integrations`, {
+      method: "POST",
+      body: JSON.stringify({ provider, config: parsed }),
+    });
+    e.target.reset();
+    e.target.type.value = providerType(e.target.provider.value);
+    await loadIntegrations();
+  } catch (err) {
+    $("integration-error").textContent = `Save failed (${err.status})`;
+  }
+});
 
 $("reports-back").onclick = () => loadProjects();
 

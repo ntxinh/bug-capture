@@ -48,6 +48,40 @@
           </thead>
           <tbody id="report-rows"></tbody>
         </table>
+        <section id="integrations">
+          <h3>Integrations</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Type</th>
+                <th>Provider</th>
+                <th>Enabled</th>
+                <th>Config</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="integration-rows"></tbody>
+          </table>
+          <form id="integration-form">
+            <select name="type" disabled>
+              <option value="integration">integration</option>
+              <option value="notification">notification</option>
+            </select>
+            <select name="provider" required>
+              <option value="github">github</option>
+              <option value="slack">slack</option>
+              <option value="webhook">webhook</option>
+              <option value="email">email</option>
+            </select>
+            <textarea
+              name="config"
+              rows="2"
+              placeholder='{"key": "value"}'
+            ></textarea>
+            <button>Add</button>
+          </form>
+          <p id="integration-error" class="error"></p>
+        </section>
       </section>
       <p id="global-error" class="error"></p>
     </main>
